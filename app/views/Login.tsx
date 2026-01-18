@@ -1,12 +1,6 @@
 
 import React, { useState } from 'react';
-import { User } from '../types';
-
-interface LoginProps {
-  onLogin: (email: string, password: string) => void;
-  onSignUp: (user: User) => void;
-  error?: string | null;
-}
+import { useAuth } from '../contexts/AuthContext';
 
 const AVATAR_COLORS = [
   'bg-emerald-500', 'bg-amber-500', 'bg-slate-500', 
@@ -14,7 +8,8 @@ const AVATAR_COLORS = [
   'bg-orange-500', 'bg-cyan-500', 'bg-violet-500'
 ];
 
-const Login: React.FC<LoginProps> = ({ onLogin, onSignUp, error }) => {
+const Login: React.FC = () => {
+  const { login, register, error, loading, clearError } = useAuth();
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [formData, setFormData] = useState({
     name: '',
@@ -22,22 +17,25 @@ const Login: React.FC<LoginProps> = ({ onLogin, onSignUp, error }) => {
     password: '',
     avatar: AVATAR_COLORS[0]
   });
+  const [localError, setLocalError] = useState<string | null>(null);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (mode === 'login') {
-      onLogin(formData.email, formData.password);
-    } else {
-      const newUser: User = {
-        id: `user-${Math.random().toString(36).substr(2, 9)}`,
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
-        avatar: formData.avatar
-      };
-      onSignUp(newUser);
+    clearError();
+    setLocalError(null);
+
+    try {
+      if (mode === 'login') {
+        await login(formData.email, formData.password);
+      } else {
+        await register(formData.name, formData.email, formData.password, formData.avatar);
+      }
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : 'An error occurred');
     }
   };
+
+  const displayError = error || localError;
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-6 font-sans selection:bg-emerald-100 selection:text-emerald-900">
@@ -57,17 +55,20 @@ const Login: React.FC<LoginProps> = ({ onLogin, onSignUp, error }) => {
               {mode === 'login' ? 'Sign In' : 'Join Community'}
             </h2>
             <button 
-              onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
+              onClick={() => {
+                setMode(mode === 'login' ? 'signup' : 'login');
+                setLocalError(null);
+              }}
               className="text-xs font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-800 transition-colors"
             >
               {mode === 'login' ? 'Create Account' : 'Back to Login'}
             </button>
           </div>
 
-          {error && (
+          {displayError && (
             <div className="mb-6 p-4 bg-red-50 border border-red-100 text-red-600 text-xs font-bold rounded-2xl flex items-center gap-3 animate-shake">
               <i className="fa-solid fa-circle-exclamation"></i>
-              {error}
+              {displayError}
             </div>
           )}
 
@@ -130,9 +131,17 @@ const Login: React.FC<LoginProps> = ({ onLogin, onSignUp, error }) => {
 
             <button
               type="submit"
-              className="w-full py-5 bg-emerald-800 text-white rounded-[1.5rem] font-black uppercase tracking-[0.2em] shadow-2xl shadow-emerald-200 hover:bg-emerald-900 hover:-translate-y-1 active:scale-95 transition-all mt-4"
+              disabled={loading}
+              className="w-full py-5 bg-emerald-800 text-white rounded-[1.5rem] font-black uppercase tracking-[0.2em] shadow-2xl shadow-emerald-200 hover:bg-emerald-900 hover:-translate-y-1 active:scale-95 transition-all mt-4 disabled:opacity-50"
             >
-              {mode === 'login' ? 'Sign In' : 'Finalize Profile'}
+              {loading ? (
+                <>
+                  <i className="fa-solid fa-spinner animate-spin mr-2"></i>
+                  {mode === 'login' ? 'Signing In...' : 'Creating Account...'}
+                </>
+              ) : (
+                mode === 'login' ? 'Sign In' : 'Finalize Profile'
+              )}
             </button>
           </form>
 
@@ -144,19 +153,12 @@ const Login: React.FC<LoginProps> = ({ onLogin, onSignUp, error }) => {
           </div>
         </div>
 
-        {/* Community Proof */}
         {mode === 'login' && (
           <div className="mt-8 text-center animate-fadeIn">
-            <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mb-4">Trusted by the community</p>
-            <div className="flex justify-center -space-x-3">
-              {[1, 2, 3, 4].map(i => (
-                <div key={i} className={`w-8 h-8 rounded-full border-2 border-slate-50 ${AVATAR_COLORS[i]} flex items-center justify-center text-[10px] text-white font-black`}>
-                  {String.fromCharCode(64 + i)}
-                </div>
-              ))}
-              <div className="w-8 h-8 rounded-full border-2 border-slate-50 bg-slate-100 flex items-center justify-center text-[8px] text-slate-400 font-black">
-                +1k
-              </div>
+            <p className="text-[11px] text-slate-400 font-bold uppercase tracking-widest mb-4">Demo Credentials</p>
+            <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm">
+              <p className="text-xs font-mono text-slate-600">Email: omar@example.com</p>
+              <p className="text-xs font-mono text-slate-600">Password: password</p>
             </div>
           </div>
         )}

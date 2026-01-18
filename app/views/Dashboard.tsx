@@ -1,26 +1,32 @@
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router';
+import { LedgerEntry, TransactionStatus, Direction, TransactionType, User } from '../types/types';
+import { useAuth } from '../contexts/AuthContext';
+import { useLedger } from '../contexts/LedgerContext';
 
-import React from 'react';
-import { LedgerEntry, TransactionStatus, Direction, TransactionType, User } from '../types';
+const Dashboard: React.FC = () => {
+  const { user, users, fetchUsers } = useAuth();
+  const { entries, fetchEntries, updateStatus, confirmEntry } = useLedger();
+  const navigate = useNavigate();
 
-interface DashboardProps {
-  entries: LedgerEntry[];
-  currentUser: User;
-  users: User[];
-  onUpdateStatus: (id: string, status: TransactionStatus) => void;
-  onConfirmEntry: (id: string) => void;
-  onAddEntry: () => void;
-}
+  useEffect(() => {
+    if (user) {
+      fetchEntries();
+      fetchUsers();
+    }
+  }, [user, fetchEntries, fetchUsers]);
 
-const Dashboard: React.FC<DashboardProps> = ({ entries, currentUser, users, onUpdateStatus, onConfirmEntry, onAddEntry }) => {
-  // Filter entries where current user is either creator or target
+  if (!user) return null;
+
+  const userId = user._id || user.id;
+
   const relevantEntries = entries.filter(e => 
-    (e.creatorId === currentUser.id || e.targetUserId === currentUser.id) &&
+    (e.creatorId === userId || e.targetUserId === userId) &&
     (e.status === TransactionStatus.PENDING || e.status === TransactionStatus.CONFIRMED)
   );
   
-  // Logic to determine if I OWE or am OWED
   const myObligations = relevantEntries.filter(e => {
-    if (e.creatorId === currentUser.id) {
+    if (e.creatorId === userId) {
       return e.direction === Direction.I_OWE;
     } else {
       return e.direction === Direction.OWED_TO_ME;
@@ -28,22 +34,26 @@ const Dashboard: React.FC<DashboardProps> = ({ entries, currentUser, users, onUp
   });
 
   const myTrusts = relevantEntries.filter(e => {
-    if (e.creatorId === currentUser.id) {
+    if (e.creatorId === userId) {
       return e.direction === Direction.OWED_TO_ME;
     } else {
       return e.direction === Direction.I_OWE;
     }
   });
 
+  const handleAddEntry = () => {
+    navigate('/new-entry');
+  };
+
   return (
     <div className="space-y-12 animate-fadeIn pb-24">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-8">
         <div>
           <h1 className="text-5xl font-black text-slate-900 tracking-tighter">My Ledger</h1>
-          <p className="text-slate-500 mt-2 text-lg font-medium">As-salāmu 'alaykum, {currentUser.name}. Honoring your trusts.</p>
+          <p className="text-slate-500 mt-2 text-lg font-medium">As-salāmu 'alaykum, {user.name}. Honoring your trusts.</p>
         </div>
         <button 
-          onClick={onAddEntry}
+          onClick={handleAddEntry}
           className="bg-emerald-800 text-white px-10 py-5 rounded-[2rem] font-black text-sm uppercase tracking-widest shadow-2xl shadow-emerald-200 hover:bg-emerald-900 hover:-translate-y-1 transition-all flex items-center gap-3 group"
         >
           <i className="fa-solid fa-plus group-hover:rotate-90 transition-transform"></i> New Entry
@@ -69,12 +79,12 @@ const Dashboard: React.FC<DashboardProps> = ({ entries, currentUser, users, onUp
             ) : (
               myObligations.map(entry => (
                 <LedgerCard 
-                  key={entry.id} 
+                  key={entry._id || entry.id} 
                   entry={entry} 
-                  currentUser={currentUser}
+                  currentUser={user}
                   users={users}
-                  onUpdateStatus={onUpdateStatus} 
-                  onConfirm={onConfirmEntry} 
+                  onUpdateStatus={updateStatus} 
+                  onConfirm={confirmEntry} 
                 />
               ))
             )}
@@ -99,12 +109,12 @@ const Dashboard: React.FC<DashboardProps> = ({ entries, currentUser, users, onUp
             ) : (
               myTrusts.map(entry => (
                 <LedgerCard 
-                  key={entry.id} 
+                  key={entry._id || entry.id} 
                   entry={entry} 
-                  currentUser={currentUser}
+                  currentUser={user}
                   users={users}
-                  onUpdateStatus={onUpdateStatus} 
-                  onConfirm={onConfirmEntry} 
+                  onUpdateStatus={updateStatus} 
+                  onConfirm={confirmEntry} 
                 />
               ))
             )}
@@ -133,19 +143,19 @@ interface LedgerCardProps {
 }
 
 const LedgerCard: React.FC<LedgerCardProps> = ({ entry, currentUser, users, onUpdateStatus, onConfirm }) => {
-  const isCreator = entry.creatorId === currentUser.id;
+  const currentUserId = currentUser._id || currentUser.id;
+  const entryId = entry._id || entry.id;
+  const isCreator = entry.creatorId === currentUserId;
   const isPending = !entry.isConfirmed;
   
   const otherUserId = isCreator ? entry.targetUserId : entry.creatorId;
-  const otherUser = users.find(u => u.id === otherUserId);
+  const otherUser = users.find(u => u._id === otherUserId || u.id === otherUserId);
 
   const isCreditor = (isCreator && entry.direction === Direction.OWED_TO_ME) || 
                      (!isCreator && entry.direction === Direction.I_OWE);
 
   return (
-    <div className={`bg-white p-8 rounded-[3rem] border transition-all group shadow-sm hover:shadow-2xl hover:-translate-y-2 ${
-      isPending ? 'border-amber-100 bg-amber-50/20' : 'border-slate-50'
-    }`}>
+    <div className={`bg-white p-8 rounded-[3rem] border transition-all group shadow-sm hover:shadow-2xl hover:-translate-y-2 ${isPending ? 'border-amber-100 bg-amber-50/20' : 'border-slate-50'}`}>
       <div className="flex justify-between items-start mb-8">
         <div className="flex gap-5">
           <div className={`w-14 h-14 rounded-[1.25rem] ${otherUser?.avatar || 'bg-slate-200'} flex items-center justify-center text-white font-black text-xl shadow-lg group-hover:scale-105 transition-transform`}>
@@ -154,9 +164,7 @@ const LedgerCard: React.FC<LedgerCardProps> = ({ entry, currentUser, users, onUp
           <div>
             <h4 className="font-black text-slate-900 text-xl">{otherUser?.name || 'Unknown'}</h4>
             <div className="flex items-center gap-2 mt-1.5">
-              <span className={`text-[10px] px-2.5 py-1 rounded-lg font-black uppercase tracking-widest ${
-                entry.type === TransactionType.AMANAH ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'
-              }`}>
+              <span className={`text-[10px] px-2.5 py-1 rounded-lg font-black uppercase tracking-widest ${entry.type === TransactionType.AMANAH ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-700'}`}>
                 {entry.type}
               </span>
               {entry.isConfirmed ? (
@@ -189,7 +197,7 @@ const LedgerCard: React.FC<LedgerCardProps> = ({ entry, currentUser, users, onUp
               </div>
             ) : (
               <button 
-                onClick={() => onConfirm(entry.id)}
+                onClick={() => onConfirm(entryId)}
                 className="w-full flex items-center justify-center gap-3 text-xs font-black uppercase tracking-widest text-white bg-emerald-800 hover:bg-emerald-900 px-8 py-5 rounded-[1.5rem] transition-all shadow-xl shadow-emerald-100 active:scale-95"
               >
                 <i className="fa-solid fa-handshake-simple text-sm"></i>
@@ -199,14 +207,14 @@ const LedgerCard: React.FC<LedgerCardProps> = ({ entry, currentUser, users, onUp
           ) : (
             <>
               <button 
-                onClick={() => onUpdateStatus(entry.id, TransactionStatus.FULFILLED)}
+                onClick={() => onUpdateStatus(entryId, TransactionStatus.FULFILLED)}
                 className="flex-1 text-xs font-black uppercase tracking-widest text-emerald-900 bg-emerald-50 hover:bg-emerald-100 px-6 py-4 rounded-[1.25rem] transition-all active:scale-95"
               >
                 {isCreditor ? 'Received' : 'Mark Honored'}
               </button>
               {isCreditor && (
                 <button 
-                  onClick={() => onUpdateStatus(entry.id, TransactionStatus.FORGIVEN)}
+                  onClick={() => onUpdateStatus(entryId, TransactionStatus.FORGIVEN)}
                   className="flex-1 text-xs font-black uppercase tracking-widest text-slate-400 hover:bg-slate-100 hover:text-slate-600 px-6 py-4 rounded-[1.25rem] transition-all active:scale-95"
                 >
                   Forgive
