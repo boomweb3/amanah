@@ -1,21 +1,15 @@
 
 import React, { useState } from 'react';
-import { DebtStatus } from '../types/types';
+import { Debt, DebtStatus } from '../types';
 
-export interface Debt {
-  id: string;
-  creditor: string;
-  amount: number;
-  paidAmount: number;
-  dueDate: string;
-  category: string;
-  notes: string;
-  status: DebtStatus;
-  createdAt: string;
+interface DebtManagementProps {
+  debts: Debt[];
+  onAdd: (debt: Debt) => void;
+  onUpdate: (debt: Debt) => void;
+  onDelete: (id: string) => void;
 }
 
-const DebtManagement: React.FC = () => {
-  const [debts, setDebts] = useState<Debt[]>([]);
+const DebtManagement: React.FC<DebtManagementProps> = ({ debts, onAdd, onUpdate, onDelete }) => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [formData, setFormData] = useState({
     creditor: '',
@@ -38,17 +32,9 @@ const DebtManagement: React.FC = () => {
       status: DebtStatus.ACTIVE,
       createdAt: new Date().toISOString()
     };
-    setDebts([...debts, newDebt]);
+    onAdd(newDebt);
     setShowAddForm(false);
     setFormData({ creditor: '', amount: '', dueDate: '', category: 'Personal', notes: '' });
-  };
-
-  const onUpdate = (debt: Debt) => {
-    setDebts(debts.map(d => d.id === debt.id ? debt : d));
-  };
-
-  const onDelete = (id: string) => {
-    setDebts(debts.filter(d => d.id !== id));
   };
 
   const toggleStatus = (debt: Debt) => {

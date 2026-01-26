@@ -1,26 +1,24 @@
 
 import React, { useState } from 'react';
+import { Supporter } from '../types';
 
-export interface Supporter {
-  id: string;
-  name: string;
-  relation: string;
-  contributionTotal: number;
+interface FamilyCircleProps {
+  supporters: Supporter[];
+  onAdd: (supporter: Supporter) => void;
 }
 
-const FamilyCircle: React.FC = () => {
-  const [supporters, setSupporters] = useState<Supporter[]>([]);
+const FamilyCircle: React.FC<FamilyCircleProps> = ({ supporters, onAdd }) => {
   const [isInviting, setIsInviting] = useState(false);
   const [inviteData, setInviteData] = useState({ name: '', relation: '' });
 
   const handleInvite = (e: React.FormEvent) => {
     e.preventDefault();
-    setSupporters([...supporters, {
+    onAdd({
       id: Math.random().toString(36).substr(2, 9),
       name: inviteData.name,
       relation: inviteData.relation,
       contributionTotal: 0
-    }]);
+    });
     setIsInviting(false);
     setInviteData({ name: '', relation: '' });
   };

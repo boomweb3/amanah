@@ -12,6 +12,12 @@ In many cultures and communities, informal debts (between family and friends) ar
 - **Bi-Directional**: Clearly view "My Responsibilities" (what I owe) versus "My Trusts" (what is owed to me).
 - **Status Lifecycle**: Manage records from *Pending* to *Confirmed*, *Fulfilled*, or even *Forgiven*.
 
+### 2. AI-Driven Ethical Inspiration
+Powered by **Gemini 3 Flash**, the app provides:
+- **Spiritual Reminders**: Ayah and Hadith snippets to motivate the honoring of trusts.
+- **Gentle Reminder Templates**: Dignified communication templates for following up with creditors or debtors.
+- **Resolution Advice**: Guidance on how to navigate financial difficulty with transparency.
+
 ### 3. Resolution & Forgiveness
 - **Convert to Charity**: Tools to help parties agree on converting an outstanding debt into Sadaqah (with consent).
 - **Forgiveness Tracking**: A dignified way to record when a debt has been forgiven by the creditor.

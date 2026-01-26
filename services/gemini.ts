@@ -13,7 +13,7 @@ export const getEthicalInspiration = async (): Promise<string[]> => {
     // Using gemini-3-flash-preview for quick text-based responses
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
-      contents: "Generate 3 short, profound ethical quotes or principles about debt, fulfilling trusts (Amanah), and financial honesty. Return them as a JSON array of strings.",
+      contents: "Generate 5 short, profound ethical quotes or principles about debt, fulfilling trusts (Amanah), and financial honesty. These should be motivational and encourage integrity. Return them as a JSON array of strings.",
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -36,7 +36,9 @@ export const getEthicalInspiration = async (): Promise<string[]> => {
     return [
       "Integrity is doing the right thing, even when no one is watching.",
       "The debt of a human is a burden that weighs on the soul until fulfilled.",
-      "Amanah (Trust) is the foundation of all righteous dealings."
+      "Amanah (Trust) is the foundation of all righteous dealings.",
+      "Transparency in financial dealings preserves the sanctity of relationships.",
+      "Honor your word as you would honor your most precious possession."
     ];
   }
 };
