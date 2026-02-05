@@ -31,7 +31,7 @@ const INITIAL_ENTRIES: LedgerEntry[] = [
     creatorId: 'user-1',
     targetUserId: 'user-3',
     partnerName: 'John Doe',
-    amount: '$250',
+    amount: '₦250',
     numericAmount: 250,
     remainingAmount: 250,
     paymentLog: [],
@@ -205,7 +205,6 @@ const App: React.FC = () => {
       ...e, 
       status, 
       resolvedAt: resolved ? new Date().toISOString() : e.resolvedAt,
-      // If manually fulfilled, ensure remaining is zero
       remainingAmount: status === TransactionStatus.FULFILLED ? 0 : e.remainingAmount
     } : e));
   };
@@ -232,6 +231,10 @@ const App: React.FC = () => {
       }
       return e;
     }));
+  };
+
+  const handleDeleteEntry = (id: string) => {
+    setEntries(prev => prev.filter(e => e.id !== id));
   };
 
   const handleMarkNotifRead = (id: string) => {
@@ -267,7 +270,7 @@ const App: React.FC = () => {
             />
           )}
           {activeTab === 'new-entry' && <LedgerForm onAdd={(e) => { setEntries([e, ...entries]); setActiveTab('ledger'); }} onCancel={() => setActiveTab('ledger')} currentUser={currentUser} users={registeredUsers} />}
-          {activeTab === 'history' && <AmanahHistory entries={entries} currentUser={currentUser} users={registeredUsers} />}
+          {activeTab === 'history' && <AmanahHistory entries={entries} currentUser={currentUser} users={registeredUsers} onDeleteEntry={handleDeleteEntry} />}
           {activeTab === 'settings' && <Settings currentUser={currentUser} onUpdateUser={(u) => { setRegisteredUsers(prev => prev.map(old => old.id === u.id ? u : old)); setCurrentUser(u); }} />}
         </>
       )}

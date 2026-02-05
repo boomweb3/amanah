@@ -104,7 +104,7 @@ const LedgerForm: React.FC<LedgerFormProps> = ({ onAdd, onCancel, currentUser, u
               <label className="block text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Value / Amount</label>
               <div className="relative">
                 {formData.type === TransactionType.DEBT && (
-                  <span className="absolute left-8 top-1/2 -translate-y-1/2 font-black text-slate-300">$</span>
+                  <span className="absolute left-8 top-1/2 -translate-y-1/2 font-black text-slate-300">₦</span>
                 )}
                 <input 
                   required 

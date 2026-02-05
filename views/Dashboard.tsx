@@ -20,6 +20,7 @@ const Dashboard: React.FC<DashboardProps> = ({ entries, currentUser, users, onUp
   const [currentInspirationIndex, setCurrentInspirationIndex] = useState(0);
   const [isLoadingInspiration, setIsLoadingInspiration] = useState(true);
   const [paymentModalEntry, setPaymentModalEntry] = useState<LedgerEntry | null>(null);
+  const [fulfillConfirmEntry, setFulfillConfirmEntry] = useState<LedgerEntry | null>(null);
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -65,6 +66,14 @@ const Dashboard: React.FC<DashboardProps> = ({ entries, currentUser, users, onUp
   const showFeedback = (msg: string) => {
     setFeedbackMessage(msg);
     setTimeout(() => setFeedbackMessage(null), 4000);
+  };
+
+  const handleFulfillConfirmed = () => {
+    if (fulfillConfirmEntry) {
+      onUpdateStatus(fulfillConfirmEntry.id, TransactionStatus.FULFILLED);
+      setFulfillConfirmEntry(null);
+      showFeedback("The trust has been successfully honored and recorded.");
+    }
   };
 
   return (
@@ -155,7 +164,7 @@ const Dashboard: React.FC<DashboardProps> = ({ entries, currentUser, users, onUp
                 key={entry.id} 
                 entry={entry} 
                 currentUser={currentUser} 
-                onUpdateStatus={onUpdateStatus} 
+                onFulfillClick={() => setFulfillConfirmEntry(entry)}
                 onConfirm={onConfirmEntry} 
                 onOpenPartial={() => setPaymentModalEntry(entry)}
               />
@@ -176,7 +185,7 @@ const Dashboard: React.FC<DashboardProps> = ({ entries, currentUser, users, onUp
                 key={entry.id} 
                 entry={entry} 
                 currentUser={currentUser} 
-                onUpdateStatus={onUpdateStatus} 
+                onFulfillClick={() => setFulfillConfirmEntry(entry)}
                 onConfirm={onConfirmEntry} 
               />
             ))}
@@ -195,9 +204,40 @@ const Dashboard: React.FC<DashboardProps> = ({ entries, currentUser, users, onUp
           }} 
         />
       )}
+
+      {fulfillConfirmEntry && (
+        <ConfirmationModal 
+          title="Confirm Fulfillment"
+          message={`Are you sure the trust with ${fulfillConfirmEntry.partnerName} for ${fulfillConfirmEntry.amount} has been truly honored?`}
+          confirmLabel="Yes, it's fulfilled"
+          onConfirm={handleFulfillConfirmed}
+          onClose={() => setFulfillConfirmEntry(null)}
+        />
+      )}
     </div>
   );
 };
+
+const ConfirmationModal = ({ title, message, confirmLabel, onConfirm, onClose }: { title: string, message: string, confirmLabel: string, onConfirm: () => void, onClose: () => void }) => (
+  <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
+    <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-md" onClick={onClose}></div>
+    <div className="bg-white dark:bg-slate-900 w-full max-w-sm p-10 rounded-[3rem] shadow-2xl relative z-10 animate-scaleUp border border-slate-100 dark:border-slate-800 text-center">
+      <div className="w-16 h-16 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+        <i className="fa-solid fa-circle-question text-2xl"></i>
+      </div>
+      <h3 className="text-xl font-black text-slate-900 dark:text-slate-100 mb-2">{title}</h3>
+      <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-8 leading-relaxed">{message}</p>
+      <div className="flex flex-col gap-3">
+        <button onClick={onConfirm} className="w-full py-4 bg-emerald-800 dark:bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl active:scale-95 transition-all">
+          {confirmLabel}
+        </button>
+        <button onClick={onClose} className="w-full py-4 text-slate-400 font-black uppercase tracking-widest text-xs hover:text-slate-600 transition-colors">
+          Go Back
+        </button>
+      </div>
+    </div>
+  </div>
+);
 
 const PartialPaymentModal = ({ entry, onClose, onSubmit }: { entry: LedgerEntry, onClose: () => void, onSubmit: (amt: number) => void }) => {
   const [amount, setAmount] = useState('');
@@ -222,7 +262,7 @@ const PartialPaymentModal = ({ entry, onClose, onSubmit }: { entry: LedgerEntry,
           <div className="space-y-2">
             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Payment Amount (Max: {remaining})</label>
             <div className="relative">
-              <span className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-slate-300">$</span>
+              <span className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-slate-300">₦</span>
               <input 
                 autoFocus
                 type="number" 
@@ -252,7 +292,7 @@ const PartialPaymentModal = ({ entry, onClose, onSubmit }: { entry: LedgerEntry,
   );
 };
 
-const LedgerCard = ({ entry, currentUser, onUpdateStatus, onConfirm, onOpenPartial }: any) => {
+const LedgerCard = ({ entry, currentUser, onFulfillClick, onConfirm, onOpenPartial }: any) => {
   const isCreator = entry.creatorId === currentUser.id;
   const isPending = !entry.isConfirmed;
   const isCreditor = (isCreator && entry.direction === Direction.OWED_TO_ME) || (!isCreator && entry.direction === Direction.I_OWE);
@@ -275,7 +315,7 @@ const LedgerCard = ({ entry, currentUser, onUpdateStatus, onConfirm, onOpenParti
         </div>
         <div className="text-right">
           <p className="text-3xl font-black text-slate-900 dark:text-slate-50 tracking-tighter">
-            {isMonetaryDebt ? `$${remaining}` : entry.amount}
+            {isMonetaryDebt ? `₦${remaining}` : entry.amount}
           </p>
           {isMonetaryDebt && remaining < entry.numericAmount && (
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">of {entry.amount}</p>
@@ -301,11 +341,11 @@ const LedgerCard = ({ entry, currentUser, onUpdateStatus, onConfirm, onOpenParti
           <button onClick={() => onConfirm(entry.id)} className="bg-emerald-800 dark:bg-emerald-600 text-white text-[10px] font-black uppercase tracking-widest px-8 py-4 rounded-xl transition-all shadow-lg shadow-emerald-900/20">Handshake & Confirm</button>
         ) : (
           <div className="flex gap-2 w-full">
-            <button onClick={() => onUpdateStatus(entry.id, TransactionStatus.FULFILLED)} className="flex-1 py-3.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-400 font-black uppercase text-[10px] tracking-widest rounded-xl hover:bg-emerald-100 transition-colors">Fulfill</button>
+            <button onClick={onFulfillClick} className="flex-1 py-3.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-400 font-black uppercase text-[10px] tracking-widest rounded-xl hover:bg-emerald-100 transition-colors">Fulfill</button>
             {isDebtor && isMonetaryDebt && (
               <button onClick={onOpenPartial} className="flex-1 py-3.5 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-black uppercase text-[10px] tracking-widest rounded-xl hover:bg-slate-100 transition-colors">Partial</button>
             )}
-            {isCreditor && <button onClick={() => onUpdateStatus(entry.id, TransactionStatus.FORGIVEN)} className="flex-1 py-3.5 text-slate-400 font-black uppercase text-[10px] tracking-widest rounded-xl hover:bg-slate-50 transition-colors">Forgive</button>}
+            {isCreditor && <button onClick={() => onFulfillClick()} className="flex-1 py-3.5 text-slate-400 font-black uppercase text-[10px] tracking-widest rounded-xl hover:bg-slate-50 transition-colors">Forgive</button>}
           </div>
         )}
       </div>
