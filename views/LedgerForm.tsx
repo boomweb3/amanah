@@ -16,7 +16,8 @@ const LedgerForm: React.FC<LedgerFormProps> = ({ onAdd, onCancel, currentUser, u
     amount: '',
     type: TransactionType.DEBT,
     direction: Direction.I_OWE,
-    notes: ''
+    notes: '',
+    dueDate: ''
   });
 
   // Suggest existing names from registered users or previous contacts
@@ -31,12 +32,24 @@ const LedgerForm: React.FC<LedgerFormProps> = ({ onAdd, onCancel, currentUser, u
     // Check if the name matches a registered user for optional verification linkage
     const matchedUser = users.find(u => u.name.toLowerCase() === partnerName.trim().toLowerCase());
 
+    // Try to extract numeric value if it's a financial debt
+    let numericAmount: number | undefined = undefined;
+    if (formData.type === TransactionType.DEBT) {
+      const parsed = parseFloat(formData.amount.replace(/[^0-9.]/g, ''));
+      if (!isNaN(parsed)) {
+        numericAmount = parsed;
+      }
+    }
+
     const entry: LedgerEntry = {
       id: Math.random().toString(36).substr(2, 9),
       creatorId: currentUser.id,
       partnerName: partnerName.trim(),
       targetUserId: matchedUser?.id,
       ...formData,
+      numericAmount,
+      remainingAmount: numericAmount,
+      paymentLog: numericAmount !== undefined ? [] : undefined,
       status: matchedUser ? TransactionStatus.PENDING : TransactionStatus.CONFIRMED,
       isConfirmed: matchedUser ? false : true,
       createdAt: new Date().toISOString()
@@ -89,7 +102,19 @@ const LedgerForm: React.FC<LedgerFormProps> = ({ onAdd, onCancel, currentUser, u
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-3">
               <label className="block text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Value / Amount</label>
-              <input required type="text" value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} className="w-full px-8 py-5 bg-slate-50 dark:bg-slate-950 border-2 border-transparent focus:border-emerald-600 rounded-[2rem] outline-none font-bold text-slate-700 dark:text-slate-200" placeholder="$0.00" />
+              <div className="relative">
+                {formData.type === TransactionType.DEBT && (
+                  <span className="absolute left-8 top-1/2 -translate-y-1/2 font-black text-slate-300">$</span>
+                )}
+                <input 
+                  required 
+                  type="text" 
+                  value={formData.amount} 
+                  onChange={(e) => setFormData({...formData, amount: e.target.value})} 
+                  className={`w-full ${formData.type === TransactionType.DEBT ? 'pl-12 pr-8' : 'px-8'} py-5 bg-slate-50 dark:bg-slate-950 border-2 border-transparent focus:border-emerald-600 rounded-[2rem] outline-none font-bold text-slate-700 dark:text-slate-200`} 
+                  placeholder={formData.type === TransactionType.DEBT ? "0.00" : "Description of item"} 
+                />
+              </div>
             </div>
             <div className="space-y-3">
               <label className="block text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Category</label>
@@ -97,6 +122,18 @@ const LedgerForm: React.FC<LedgerFormProps> = ({ onAdd, onCancel, currentUser, u
                 <option value={TransactionType.DEBT}>Financial Debt</option>
                 <option value={TransactionType.AMANAH}>Amānah (Physical Item)</option>
               </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="space-y-3">
+              <label className="block text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Fulfillment Target (Optional)</label>
+              <input 
+                type="date" 
+                value={formData.dueDate} 
+                onChange={(e) => setFormData({...formData, dueDate: e.target.value})} 
+                className="w-full px-8 py-5 bg-slate-50 dark:bg-slate-950 border-2 border-transparent focus:border-emerald-600 rounded-[2rem] outline-none font-bold text-slate-700 dark:text-slate-200" 
+              />
             </div>
           </div>
 

@@ -17,20 +17,45 @@ export enum Direction {
   OWED_TO_ME = 'Owed to Me'
 }
 
+export interface ReminderSettings {
+  enabled: boolean;
+  sevenDay: boolean;
+  oneDay: boolean;
+}
+
 export interface User {
   id: string;
   name: string;
   email: string;
   avatar?: string; 
   password?: string;
+  reminderSettings?: ReminderSettings;
+}
+
+export interface AppNotification {
+  id: string;
+  entryId: string;
+  title: string;
+  message: string;
+  createdAt: string;
+  isRead: boolean;
+}
+
+export interface PaymentRecord {
+  id: string;
+  amount: number;
+  date: string;
 }
 
 export interface LedgerEntry {
   id: string;
   creatorId: string;
-  partnerName: string; // The primary name identifier for the record
-  targetUserId?: string; // Optional linkage to a registered user for verification
-  amount: string;
+  partnerName: string; 
+  targetUserId?: string; 
+  amount: string; // Display amount
+  numericAmount?: number; // Internal numeric value for debts
+  remainingAmount?: number; // Remaining balance
+  paymentLog?: PaymentRecord[]; // History of partial payments
   type: TransactionType;
   direction: Direction;
   status: TransactionStatus;

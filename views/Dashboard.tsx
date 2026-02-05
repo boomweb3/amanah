@@ -11,13 +11,16 @@ interface DashboardProps {
   users: User[];
   onUpdateStatus: (id: string, status: TransactionStatus) => void;
   onConfirmEntry: (id: string) => void;
+  onPartialPayment: (id: string, amount: number) => void;
   onAddEntry: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ entries, currentUser, users, onUpdateStatus, onConfirmEntry, onAddEntry }) => {
+const Dashboard: React.FC<DashboardProps> = ({ entries, currentUser, users, onUpdateStatus, onConfirmEntry, onPartialPayment, onAddEntry }) => {
   const [inspirations, setInspirations] = useState<string[]>([]);
   const [currentInspirationIndex, setCurrentInspirationIndex] = useState(0);
   const [isLoadingInspiration, setIsLoadingInspiration] = useState(true);
+  const [paymentModalEntry, setPaymentModalEntry] = useState<LedgerEntry | null>(null);
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -59,6 +62,11 @@ const Dashboard: React.FC<DashboardProps> = ({ entries, currentUser, users, onUp
     return Math.round((fulfilled / total) * 100);
   }, [relevantEntries]);
 
+  const showFeedback = (msg: string) => {
+    setFeedbackMessage(msg);
+    setTimeout(() => setFeedbackMessage(null), 4000);
+  };
+
   return (
     <div className="space-y-12 animate-fadeIn pb-24">
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
@@ -73,6 +81,13 @@ const Dashboard: React.FC<DashboardProps> = ({ entries, currentUser, users, onUp
           <i className="fa-solid fa-plus"></i> Record New
         </button>
       </header>
+
+      {feedbackMessage && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[100] bg-slate-900 dark:bg-emerald-900 text-white px-8 py-4 rounded-full shadow-2xl animate-fadeIn border border-white/10 flex items-center gap-4">
+          <i className="fa-solid fa-circle-check text-emerald-400"></i>
+          <span className="text-sm font-bold uppercase tracking-widest">{feedbackMessage}</span>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         <section className="xl:col-span-2 relative overflow-hidden bg-slate-900 dark:bg-black rounded-[4rem] shadow-2xl group">
@@ -135,7 +150,16 @@ const Dashboard: React.FC<DashboardProps> = ({ entries, currentUser, users, onUp
             Responsibilities
           </h3>
           <div className="space-y-6">
-            {myObligations.length === 0 ? <EmptyState message="No responsibilities." /> : myObligations.map(entry => <LedgerCard key={entry.id} entry={entry} currentUser={currentUser} onUpdateStatus={onUpdateStatus} onConfirm={onConfirmEntry} />)}
+            {myObligations.length === 0 ? <EmptyState message="No responsibilities." /> : myObligations.map(entry => (
+              <LedgerCard 
+                key={entry.id} 
+                entry={entry} 
+                currentUser={currentUser} 
+                onUpdateStatus={onUpdateStatus} 
+                onConfirm={onConfirmEntry} 
+                onOpenPartial={() => setPaymentModalEntry(entry)}
+              />
+            ))}
           </div>
         </section>
 
@@ -147,25 +171,101 @@ const Dashboard: React.FC<DashboardProps> = ({ entries, currentUser, users, onUp
             Trusts
           </h3>
           <div className="space-y-6">
-            {myTrusts.length === 0 ? <EmptyState message="No trusts." /> : myTrusts.map(entry => <LedgerCard key={entry.id} entry={entry} currentUser={currentUser} onUpdateStatus={onUpdateStatus} onConfirm={onConfirmEntry} />)}
+            {myTrusts.length === 0 ? <EmptyState message="No trusts." /> : myTrusts.map(entry => (
+              <LedgerCard 
+                key={entry.id} 
+                entry={entry} 
+                currentUser={currentUser} 
+                onUpdateStatus={onUpdateStatus} 
+                onConfirm={onConfirmEntry} 
+              />
+            ))}
           </div>
         </section>
+      </div>
+
+      {paymentModalEntry && (
+        <PartialPaymentModal 
+          entry={paymentModalEntry} 
+          onClose={() => setPaymentModalEntry(null)} 
+          onSubmit={(amt) => {
+            onPartialPayment(paymentModalEntry.id, amt);
+            setPaymentModalEntry(null);
+            showFeedback("Progress recorded. Every step toward fulfillment matters.");
+          }} 
+        />
+      )}
+    </div>
+  );
+};
+
+const PartialPaymentModal = ({ entry, onClose, onSubmit }: { entry: LedgerEntry, onClose: () => void, onSubmit: (amt: number) => void }) => {
+  const [amount, setAmount] = useState('');
+  const remaining = entry.remainingAmount ?? entry.numericAmount ?? 0;
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const val = parseFloat(amount);
+    if (!isNaN(val) && val > 0 && val <= remaining) {
+      onSubmit(val);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+      <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-md" onClick={onClose}></div>
+      <div className="bg-white dark:bg-slate-900 w-full max-w-md p-10 rounded-[3rem] shadow-2xl relative z-10 animate-scaleUp border border-slate-100 dark:border-slate-800">
+        <h3 className="text-2xl font-black text-slate-900 dark:text-slate-100 mb-2">Record Payment</h3>
+        <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-8">Reducing the trust with {entry.partnerName}.</p>
+        
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4">Payment Amount (Max: {remaining})</label>
+            <div className="relative">
+              <span className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-slate-300">$</span>
+              <input 
+                autoFocus
+                type="number" 
+                step="0.01"
+                required
+                value={amount} 
+                onChange={(e) => setAmount(e.target.value)}
+                className="w-full pl-12 pr-8 py-5 bg-slate-50 dark:bg-slate-950 border-2 border-transparent focus:border-emerald-600 rounded-2xl outline-none font-black text-2xl text-slate-700 dark:text-slate-100"
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-4 pt-4">
+            <button type="button" onClick={onClose} className="px-6 py-4 text-slate-400 font-black uppercase tracking-widest text-xs hover:text-slate-600 transition-colors">Cancel</button>
+            <button 
+              type="submit" 
+              disabled={!amount || parseFloat(amount) <= 0 || parseFloat(amount) > remaining}
+              className="flex-1 py-4 bg-emerald-800 dark:bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl disabled:opacity-30 transition-all"
+            >
+              Update Ledger
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
 };
 
-const LedgerCard = ({ entry, currentUser, onUpdateStatus, onConfirm }: any) => {
+const LedgerCard = ({ entry, currentUser, onUpdateStatus, onConfirm, onOpenPartial }: any) => {
   const isCreator = entry.creatorId === currentUser.id;
   const isPending = !entry.isConfirmed;
   const isCreditor = (isCreator && entry.direction === Direction.OWED_TO_ME) || (!isCreator && entry.direction === Direction.I_OWE);
+  const isDebtor = !isCreditor;
+  const isMonetaryDebt = entry.type === TransactionType.DEBT && entry.numericAmount !== undefined;
   
-  // Use partnerName for display, seed avatar with it
   const displayName = entry.partnerName;
+  const remaining = entry.remainingAmount ?? entry.numericAmount;
+  const progress = isMonetaryDebt ? Math.round(((entry.numericAmount - remaining) / entry.numericAmount) * 100) : 0;
 
   return (
     <div className={`bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border transition-all shadow-sm group relative overflow-hidden ${isPending ? 'border-amber-100 dark:border-amber-900/30 bg-amber-50/5' : 'border-slate-100 dark:border-slate-800'}`}>
-      <div className="flex justify-between items-start mb-8 relative z-10">
+      <div className="flex justify-between items-start mb-6 relative z-10">
         <div className="flex gap-4">
           <GeneratedAvatar seed={displayName} size="md" className="rounded-2xl" />
           <div>
@@ -173,8 +273,28 @@ const LedgerCard = ({ entry, currentUser, onUpdateStatus, onConfirm }: any) => {
             <span className="text-[9px] px-2 py-0.5 rounded-lg font-black uppercase tracking-widest bg-slate-100 dark:bg-slate-800 text-slate-500 mt-1 inline-block">{entry.type}</span>
           </div>
         </div>
-        <p className="text-3xl font-black text-slate-900 dark:text-slate-50 tracking-tighter">{entry.amount}</p>
+        <div className="text-right">
+          <p className="text-3xl font-black text-slate-900 dark:text-slate-50 tracking-tighter">
+            {isMonetaryDebt ? `$${remaining}` : entry.amount}
+          </p>
+          {isMonetaryDebt && remaining < entry.numericAmount && (
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">of {entry.amount}</p>
+          )}
+        </div>
       </div>
+
+      {isMonetaryDebt && (
+        <div className="mb-8 relative z-10">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Fulfillment Progress</p>
+            <p className="text-[9px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest">{progress}%</p>
+          </div>
+          <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+            <div className="h-full bg-emerald-500 transition-all duration-700" style={{ width: `${progress}%` }}></div>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between pt-5 border-t border-slate-50 dark:border-slate-800 relative z-10">
         {isPending ? (
           isCreator ? <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest italic">Waiting for verification...</p> : 
@@ -182,6 +302,9 @@ const LedgerCard = ({ entry, currentUser, onUpdateStatus, onConfirm }: any) => {
         ) : (
           <div className="flex gap-2 w-full">
             <button onClick={() => onUpdateStatus(entry.id, TransactionStatus.FULFILLED)} className="flex-1 py-3.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-400 font-black uppercase text-[10px] tracking-widest rounded-xl hover:bg-emerald-100 transition-colors">Fulfill</button>
+            {isDebtor && isMonetaryDebt && (
+              <button onClick={onOpenPartial} className="flex-1 py-3.5 bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400 font-black uppercase text-[10px] tracking-widest rounded-xl hover:bg-slate-100 transition-colors">Partial</button>
+            )}
             {isCreditor && <button onClick={() => onUpdateStatus(entry.id, TransactionStatus.FORGIVEN)} className="flex-1 py-3.5 text-slate-400 font-black uppercase text-[10px] tracking-widest rounded-xl hover:bg-slate-50 transition-colors">Forgive</button>}
           </div>
         )}

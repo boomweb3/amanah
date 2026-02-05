@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { User } from '../types';
+import { User, AppNotification } from '../types';
 import { AppTab } from '../App';
 import GeneratedAvatar from './GeneratedAvatar';
 
@@ -12,15 +12,24 @@ interface LayoutProps {
   onLogout: () => void;
   theme: 'light' | 'dark';
   toggleTheme: () => void;
+  notifications: AppNotification[];
+  onMarkRead: (id: string) => void;
+  onClearAll: () => void;
 }
 
-const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, currentUser, onLogout, theme, toggleTheme }) => {
+const Layout: React.FC<LayoutProps> = ({ 
+  children, activeTab, setActiveTab, currentUser, onLogout, theme, toggleTheme,
+  notifications, onMarkRead, onClearAll
+}) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isNotifOpen, setIsNotifOpen] = useState(false);
 
-  // Close menu on route change or when clicking outside
+  const unreadCount = notifications.filter(n => !n.isRead).length;
+
   const handleTabChange = (tab: AppTab) => {
     setActiveTab(tab);
     setIsMenuOpen(false);
+    setIsNotifOpen(false);
   };
 
   if (!currentUser) return <>{children}</>;
@@ -35,13 +44,22 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col md:flex-row transition-all duration-300">
       
-      {/* MOBILE TOP HEADER (Brand Only) */}
+      {/* MOBILE TOP HEADER */}
       <header className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 flex items-center justify-between px-6 z-40">
         <button onClick={() => handleTabChange('ledger')} className="text-xl font-black text-emerald-800 dark:text-emerald-400 flex items-center gap-2">
           <i className="fa-solid fa-feather-pointed"></i>
           <span className="tracking-tighter">Amānah</span>
         </button>
         <div className="flex items-center gap-3">
+          <button 
+            onClick={() => setIsNotifOpen(!isNotifOpen)} 
+            className="relative w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800/50 text-slate-500"
+          >
+            <i className="fa-solid fa-bell"></i>
+            {unreadCount > 0 && (
+              <span className="absolute top-2 right-2 w-2 h-2 bg-emerald-500 rounded-full border-2 border-white dark:border-slate-900"></span>
+            )}
+          </button>
           <button onClick={toggleTheme} className="text-slate-400 dark:text-slate-500 w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800/50">
             <i className={`fa-solid ${theme === 'light' ? 'fa-moon' : 'fa-sun'}`}></i>
           </button>
@@ -49,7 +67,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
         </div>
       </header>
 
-      {/* DESKTOP SIDEBAR (Unchanged) */}
+      {/* DESKTOP SIDEBAR */}
       <nav className="hidden md:flex w-20 lg:w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 shadow-sm flex-col fixed inset-y-0 z-20">
         <div className="p-8">
           <button onClick={() => setActiveTab('ledger')} className="text-2xl font-black text-emerald-800 dark:text-emerald-400 flex items-center gap-3">
@@ -68,6 +86,19 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
               <span className="hidden lg:block text-sm uppercase tracking-widest">{item.label}</span>
             </button>
           ))}
+          
+          <button 
+            onClick={() => setIsNotifOpen(!isNotifOpen)}
+            className={`w-full flex items-center justify-center lg:justify-start gap-4 px-0 lg:px-6 py-4 rounded-2xl transition-all relative ${isNotifOpen ? 'bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100' : 'text-slate-500 hover:bg-slate-50'}`}
+          >
+            <i className="fa-solid fa-bell text-lg lg:text-base"></i>
+            <span className="hidden lg:block text-sm uppercase tracking-widest">Reminders</span>
+            {unreadCount > 0 && (
+              <span className="absolute top-4 right-4 lg:right-6 bg-emerald-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-900">
+                {unreadCount}
+              </span>
+            )}
+          </button>
         </div>
         <div className="p-6 border-t border-slate-100 dark:border-slate-800">
            <div className="flex flex-col lg:flex-row items-center justify-between mb-4 gap-4">
@@ -80,6 +111,58 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
         </div>
       </nav>
 
+      {/* NOTIFICATION TRAY */}
+      <div 
+        className={`fixed inset-0 z-[70] transition-opacity duration-300 ${isNotifOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+      >
+        <div className="absolute inset-0 bg-slate-950/20 backdrop-blur-[2px]" onClick={() => setIsNotifOpen(false)}></div>
+        <div 
+          className={`absolute top-0 right-0 h-full w-full sm:w-80 md:w-96 bg-white dark:bg-slate-900 shadow-2xl transition-transform duration-300 ease-out border-l border-slate-100 dark:border-slate-800 flex flex-col ${isNotifOpen ? 'translate-x-0' : 'translate-x-full'}`}
+        >
+          <header className="p-8 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+            <h3 className="text-lg font-black text-slate-900 dark:text-slate-100 uppercase tracking-tight">Trust Reminders</h3>
+            <button onClick={() => setIsNotifOpen(false)} className="text-slate-400 hover:text-slate-600 transition-colors">
+              <i className="fa-solid fa-xmark text-xl"></i>
+            </button>
+          </header>
+          
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
+            {notifications.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-full text-center p-8">
+                <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800 rounded-2xl flex items-center justify-center mb-4 text-slate-200">
+                  <i className="fa-solid fa-bell-slash text-2xl"></i>
+                </div>
+                <p className="text-slate-400 text-xs font-black uppercase tracking-widest leading-loose">No active reminders.<br/>Peace of mind is a gift.</p>
+              </div>
+            ) : (
+              notifications.map(n => (
+                <div 
+                  key={n.id} 
+                  className={`p-5 rounded-2xl border transition-all ${n.isRead ? 'bg-slate-50/50 dark:bg-slate-800/30 border-slate-100 dark:border-slate-800 opacity-60' : 'bg-emerald-50/20 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-800'}`}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.2em]">{n.title}</span>
+                    {!n.isRead && <button onClick={() => onMarkRead(n.id)} className="text-[10px] font-black text-slate-400 hover:text-emerald-600 uppercase tracking-widest">Mark read</button>}
+                  </div>
+                  <p className="text-sm text-slate-700 dark:text-slate-300 font-medium leading-relaxed">{n.message}</p>
+                  <p className="text-[9px] text-slate-400 mt-3 font-bold uppercase tracking-widest">
+                    {new Date(n.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                  </p>
+                </div>
+              ))
+            )}
+          </div>
+
+          {notifications.length > 0 && (
+            <footer className="p-6 border-t border-slate-100 dark:border-slate-800">
+              <button onClick={onClearAll} className="w-full py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-200 transition-colors">
+                Clear all records
+              </button>
+            </footer>
+          )}
+        </div>
+      </div>
+
       {/* MOBILE BOTTOM NAVIGATION BAR */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 h-20 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 px-6 pb-2 z-50 flex items-center justify-around shadow-[0_-4px_20px_rgba(0,0,0,0.03)]">
         <button 
@@ -90,7 +173,6 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
           <span className="text-[9px] font-black uppercase tracking-widest">Ledger</span>
         </button>
 
-        {/* Primary Action Button (Maintains Visibility) */}
         <button 
           onClick={() => handleTabChange('new-entry')} 
           className={`w-14 h-14 -mt-10 rounded-2xl shadow-xl flex items-center justify-center transition-all active:scale-90 ${activeTab === 'new-entry' ? 'bg-emerald-700 text-white shadow-emerald-500/20' : 'bg-slate-900 text-white'}`}
@@ -107,14 +189,11 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab, curr
         </button>
       </nav>
 
-      {/* MOBILE OVERFLOW MENU (Slide-up Drawer) */}
+      {/* MOBILE OVERFLOW MENU */}
       <div 
         className={`md:hidden fixed inset-0 z-[60] transition-opacity duration-300 ${isMenuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
       >
-        {/* Backdrop overlay */}
         <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-sm" onClick={() => setIsMenuOpen(false)}></div>
-        
-        {/* Drawer Content */}
         <div 
           className={`absolute bottom-0 left-0 right-0 bg-white dark:bg-slate-900 rounded-t-[2.5rem] p-8 pb-12 transition-transform duration-300 ease-out shadow-2xl ${isMenuOpen ? 'translate-y-0' : 'translate-y-full'}`}
         >

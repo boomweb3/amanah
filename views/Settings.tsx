@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { User } from '../types';
+import { User, ReminderSettings } from '../types';
 import GeneratedAvatar from '../components/GeneratedAvatar';
 
 interface SettingsProps {
@@ -13,8 +13,13 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser }) => {
     name: currentUser.name
   });
 
+  const [reminderSettings, setReminderSettings] = useState<ReminderSettings>(currentUser.reminderSettings || {
+    enabled: true,
+    sevenDay: true,
+    oneDay: true
+  });
+
   const [notifications, setNotifications] = useState({
-    dueDate: true,
     verification: true
   });
 
@@ -32,7 +37,8 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser }) => {
     setTimeout(() => {
       onUpdateUser({
         ...currentUser,
-        name: profileData.name
+        name: profileData.name,
+        reminderSettings
       });
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 3000);
@@ -89,22 +95,48 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser }) => {
             </div>
           </section>
 
-          {/* Notifications Section */}
+          {/* Gentle Reminders Section */}
           <section className="bg-white dark:bg-slate-900 p-10 rounded-[3.5rem] border border-slate-100 dark:border-slate-800 shadow-sm">
             <h3 className="text-xl font-black text-slate-900 dark:text-slate-100 mb-8 flex items-center gap-3">
               <i className="fa-solid fa-bell text-accent-text"></i>
-              Privacy & Notifications
+              Gentle Reminders
             </h3>
             <div className="space-y-8">
               <Toggle 
-                label="Trust Reminders" 
-                description="Receive alerts for upcoming commitments."
-                active={notifications.dueDate}
-                onToggle={() => setNotifications({...notifications, dueDate: !notifications.dueDate})}
+                label="Enable Reminders" 
+                description="Receive calm alerts for upcoming commitments."
+                active={reminderSettings.enabled}
+                onToggle={() => setReminderSettings({...reminderSettings, enabled: !reminderSettings.enabled})}
               />
+              {reminderSettings.enabled && (
+                <div className="pl-6 space-y-6 pt-2 animate-fadeIn">
+                  <Toggle 
+                    label="7-Day Insight" 
+                    description="A respectful notice one week before a due date."
+                    active={reminderSettings.sevenDay}
+                    onToggle={() => setReminderSettings({...reminderSettings, sevenDay: !reminderSettings.sevenDay})}
+                  />
+                  <Toggle 
+                    label="Final Day Notice" 
+                    description="A quiet reminder when a trust is nearing fulfillment."
+                    active={reminderSettings.oneDay}
+                    onToggle={() => setReminderSettings({...reminderSettings, oneDay: !reminderSettings.oneDay})}
+                  />
+                </div>
+              )}
+            </div>
+          </section>
+
+          {/* Partner Notifications Section */}
+          <section className="bg-white dark:bg-slate-900 p-10 rounded-[3.5rem] border border-slate-100 dark:border-slate-800 shadow-sm">
+            <h3 className="text-xl font-black text-slate-900 dark:text-slate-100 mb-8 flex items-center gap-3">
+              <i className="fa-solid fa-shield-halved text-accent-text"></i>
+              Network Verification
+            </h3>
+            <div className="space-y-8">
               <Toggle 
                 label="Partner Alerts" 
-                description="Instant notifications for verification requests."
+                description="Instant notifications for verification requests from others."
                 active={notifications.verification}
                 onToggle={() => setNotifications({...notifications, verification: !notifications.verification})}
               />
@@ -131,16 +163,6 @@ const Settings: React.FC<SettingsProps> = ({ currentUser, onUpdateUser }) => {
               {isCopied ? 'ID Link Copied' : 'Copy Profile Link'}
             </button>
           </section>
-
-          <div className="p-6 bg-slate-50 dark:bg-slate-900/60 rounded-[2rem] border border-slate-100 dark:border-slate-800">
-            <div className="flex items-center gap-3 mb-2">
-              <i className="fa-solid fa-shield-halved text-accent-text text-xs"></i>
-              <h4 className="text-slate-800 dark:text-slate-200 font-black text-xs uppercase tracking-widest">Amanah Security</h4>
-            </div>
-            <p className="text-slate-500 dark:text-slate-500 text-[10px] leading-relaxed font-medium">
-              Your pattern is generated from your account ID. It is your visual fingerprint within the network.
-            </p>
-          </div>
         </div>
       </div>
     </div>
