@@ -6,6 +6,7 @@ import LedgerForm from './views/LedgerForm';
 import Login from './views/Login';
 import GuestVerification from './views/GuestVerification';
 import Settings from './views/Settings';
+import AmanahHistory from './views/AmanahHistory';
 import Layout from './components/Layout';
 
 const STORAGE_KEYS = {
@@ -16,12 +17,10 @@ const STORAGE_KEYS = {
 };
 
 const INITIAL_USERS: User[] = [
-  { id: 'user-1', name: 'Omar Farooq', email: 'omar@example.com', password: 'password', avatar: 'bg-emerald-500' },
-  { id: 'user-2', name: 'Fatima Zahra', email: 'fatima@example.com', password: 'password', avatar: 'bg-amber-500' },
-  { id: 'user-3', name: 'John Doe', email: 'john@example.com', password: 'password', avatar: 'bg-slate-500' },
-  { id: 'user-4', name: 'Zainab Ahmed', email: 'zainab@example.com', password: 'password', avatar: 'bg-rose-500' },
-  { id: 'user-5', name: 'Hamza Khan', email: 'hamza@example.com', password: 'password', avatar: 'bg-indigo-500' },
-  { id: 'user-6', name: 'Sarah Malik', email: 'sarah@example.com', password: 'password', avatar: 'bg-teal-500' },
+  { id: 'user-1', name: 'Omar Farooq', email: 'omar@example.com', password: 'password' },
+  { id: 'user-2', name: 'Fatima Zahra', email: 'fatima@example.com', password: 'password' },
+  { id: 'user-3', name: 'John Doe', email: 'john@example.com', password: 'password' },
+  { id: 'user-4', name: 'Zainab Ahmed', email: 'zainab@example.com', password: 'password' },
 ];
 
 const INITIAL_ENTRIES: LedgerEntry[] = [
@@ -29,6 +28,7 @@ const INITIAL_ENTRIES: LedgerEntry[] = [
     id: 'entry-1',
     creatorId: 'user-1',
     targetUserId: 'user-3',
+    partnerName: 'John Doe',
     amount: '$250',
     type: TransactionType.DEBT,
     direction: Direction.I_OWE,
@@ -42,6 +42,7 @@ const INITIAL_ENTRIES: LedgerEntry[] = [
     id: 'entry-2',
     creatorId: 'user-2',
     targetUserId: 'user-1',
+    partnerName: 'Omar Farooq',
     amount: 'Gold Ring',
     type: TransactionType.AMANAH,
     direction: Direction.OWED_TO_ME,
@@ -51,6 +52,8 @@ const INITIAL_ENTRIES: LedgerEntry[] = [
     createdAt: new Date().toISOString()
   }
 ];
+
+export type AppTab = 'ledger' | 'new-entry' | 'history' | 'settings';
 
 const App: React.FC = () => {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -73,15 +76,16 @@ const App: React.FC = () => {
     return saved ? JSON.parse(saved) : INITIAL_ENTRIES;
   });
 
-  const [activeTab, setActiveTab] = useState<'ledger' | 'new-entry' | 'settings'>('ledger');
+  const [activeTab, setActiveTab] = useState<AppTab>('ledger');
   const [authError, setAuthError] = useState<string | null>(null);
-  
-  const [guestEntryId, setGuestEntryId] = useState<string | null>(() => {
-    const params = new URLSearchParams(window.location.search);
-    return params.get('v');
-  });
 
-  // Handle Dark Mode
+  useEffect(() => {
+    document.documentElement.style.setProperty('--accent-primary', '#047857');
+    document.documentElement.style.setProperty('--accent-soft', '#ecfdf5');
+    document.documentElement.style.setProperty('--accent-dark', '#064e3b');
+    document.documentElement.style.setProperty('--accent-text', '#047857');
+  }, []);
+
   useEffect(() => {
     if (theme === 'dark') {
       document.documentElement.classList.add('dark');
@@ -113,13 +117,13 @@ const App: React.FC = () => {
       setCurrentUser(user);
       setAuthError(null);
     } else {
-      setAuthError('Invalid email or password. Please try again.');
+      setAuthError('Invalid email or password.');
     }
   };
 
   const handleSignUp = (user: User) => {
     if (registeredUsers.find(u => u.email === user.email)) {
-      setAuthError('An account with this email already exists.');
+      setAuthError('Email already exists.');
       return;
     }
     setRegisteredUsers(prev => [...prev, user]);
@@ -127,96 +131,30 @@ const App: React.FC = () => {
     setAuthError(null);
   };
 
-  const handleUpdateUser = (updatedUser: User) => {
-    setRegisteredUsers(prev => prev.map(u => u.id === updatedUser.id ? updatedUser : u));
-    setCurrentUser(updatedUser);
-  };
-
-  const handleAddEntry = (entry: LedgerEntry) => {
-    setEntries(prev => [entry, ...prev]);
-    setActiveTab('ledger');
-  };
-
   const handleUpdateStatus = (id: string, status: TransactionStatus) => {
-    setEntries(prev => prev.map(e => e.id === id ? { ...e, status } : e));
+    const resolved = [TransactionStatus.FULFILLED, TransactionStatus.FORGIVEN, TransactionStatus.CHARITY].includes(status);
+    setEntries(prev => prev.map(e => e.id === id ? { 
+      ...e, 
+      status, 
+      resolvedAt: resolved ? new Date().toISOString() : e.resolvedAt 
+    } : e));
   };
-
-  const handleConfirmEntry = (id: string) => {
-    setEntries(prev => prev.map(e => 
-      e.id === id 
-        ? { ...e, isConfirmed: true, status: TransactionStatus.CONFIRMED } 
-        : e
-    ));
-  };
-
-  const handleLogout = () => {
-    setCurrentUser(null);
-    setAuthError(null);
-    setActiveTab('ledger');
-  };
-
-  const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
-
-  const guestEntry = guestEntryId ? entries.find(e => e.id === guestEntryId) : null;
-
-  if (guestEntry) {
-    return (
-      <GuestVerification 
-        entry={guestEntry}
-        users={registeredUsers}
-        onConfirm={(id) => handleUpdateStatus(id, TransactionStatus.FULFILLED)}
-        onDispute={(id) => handleUpdateStatus(id, TransactionStatus.PENDING)}
-        onGoHome={() => {
-          setGuestEntryId(null);
-          window.history.replaceState({}, document.title, window.location.pathname);
-        }}
-        theme={theme}
-      />
-    );
-  }
-
-  if (!currentUser) {
-    return (
-      <Login 
-        onLogin={handleLogin} 
-        onSignUp={handleSignUp} 
-        error={authError} 
-      />
-    );
-  }
 
   return (
     <Layout 
-      activeTab={activeTab} 
-      setActiveTab={setActiveTab} 
-      currentUser={currentUser}
-      onLogout={handleLogout}
-      theme={theme}
-      toggleTheme={toggleTheme}
+      activeTab={activeTab} setActiveTab={setActiveTab} 
+      currentUser={currentUser} onLogout={() => setCurrentUser(null)}
+      theme={theme} toggleTheme={() => setTheme(prev => prev === 'light' ? 'dark' : 'light')}
     >
-      {activeTab === 'ledger' && (
-        <Dashboard 
-          entries={entries} 
-          currentUser={currentUser}
-          users={registeredUsers}
-          onUpdateStatus={handleUpdateStatus}
-          onConfirmEntry={handleConfirmEntry}
-          onAddEntry={() => setActiveTab('new-entry')}
-        />
-      )}
-      {activeTab === 'new-entry' && (
-        <LedgerForm 
-          onAdd={handleAddEntry} 
-          onCancel={() => setActiveTab('ledger')}
-          currentUser={currentUser}
-          users={registeredUsers}
-        />
-      )}
-      {activeTab === 'settings' && (
-        <Settings 
-          currentUser={currentUser} 
-          onUpdateUser={handleUpdateUser}
-        />
+      {!currentUser ? (
+        <Login onLogin={handleLogin} onSignUp={handleSignUp} error={authError} theme={theme} toggleTheme={() => setTheme(prev => prev === 'light' ? 'dark' : 'light')} />
+      ) : (
+        <>
+          {activeTab === 'ledger' && <Dashboard entries={entries} currentUser={currentUser} users={registeredUsers} onUpdateStatus={handleUpdateStatus} onConfirmEntry={(id) => handleUpdateStatus(id, TransactionStatus.CONFIRMED)} onAddEntry={() => setActiveTab('new-entry')} />}
+          {activeTab === 'new-entry' && <LedgerForm onAdd={(e) => { setEntries([e, ...entries]); setActiveTab('ledger'); }} onCancel={() => setActiveTab('ledger')} currentUser={currentUser} users={registeredUsers} />}
+          {activeTab === 'history' && <AmanahHistory entries={entries} currentUser={currentUser} users={registeredUsers} />}
+          {activeTab === 'settings' && <Settings currentUser={currentUser} onUpdateUser={(u) => { setRegisteredUsers(prev => prev.map(old => old.id === u.id ? u : old)); setCurrentUser(u); }} />}
+        </>
       )}
     </Layout>
   );

@@ -21,22 +21,24 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  avatar?: string; // This holds the tailwind background class
-  password?: string; // For simulation
+  avatar?: string; 
+  password?: string;
 }
 
 export interface LedgerEntry {
   id: string;
-  creatorId: string; // The user who created the record
-  targetUserId: string; // The user on the other side of the transaction
+  creatorId: string;
+  partnerName: string; // The primary name identifier for the record
+  targetUserId?: string; // Optional linkage to a registered user for verification
   amount: string;
   type: TransactionType;
-  direction: Direction; // Perspective of the CREATOR
+  direction: Direction;
   status: TransactionStatus;
   dueDate?: string;
   notes: string;
   isConfirmed: boolean;
   createdAt: string;
+  resolvedAt?: string;
 }
 
 export enum DebtStatus {
