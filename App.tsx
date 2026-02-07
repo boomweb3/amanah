@@ -7,6 +7,7 @@ import Login from './views/Login';
 import GuestVerification from './views/GuestVerification';
 import Settings from './views/Settings';
 import AmanahHistory from './views/AmanahHistory';
+import RecordDetail from './views/RecordDetail';
 import Layout from './components/Layout';
 
 const STORAGE_KEYS = {
@@ -38,27 +39,15 @@ const INITIAL_ENTRIES: LedgerEntry[] = [
     type: TransactionType.DEBT,
     direction: Direction.I_OWE,
     status: TransactionStatus.CONFIRMED,
-    dueDate: new Date(Date.now() + 86400000 * 5).toISOString().split('T')[0], // 5 days from now
+    dueDate: new Date(Date.now() + 86400000 * 5).toISOString().split('T')[0],
     notes: 'Car repair loan - mutual agreement.',
     isConfirmed: true,
-    createdAt: new Date().toISOString()
-  },
-  {
-    id: 'entry-2',
-    creatorId: 'user-2',
-    targetUserId: 'user-1',
-    partnerName: 'Omar Farooq',
-    amount: 'Gold Ring',
-    type: TransactionType.AMANAH,
-    direction: Direction.OWED_TO_ME,
-    status: TransactionStatus.PENDING,
-    notes: 'Safekeeping for travel. Handed over on 15th.',
-    isConfirmed: false,
+    requireVerification: true,
     createdAt: new Date().toISOString()
   }
 ];
 
-export type AppTab = 'ledger' | 'new-entry' | 'history' | 'settings';
+export type AppTab = 'ledger' | 'new-entry' | 'history' | 'settings' | 'record-detail';
 
 const App: React.FC = () => {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
@@ -87,6 +76,7 @@ const App: React.FC = () => {
   });
 
   const [activeTab, setActiveTab] = useState<AppTab>('ledger');
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -125,10 +115,8 @@ const App: React.FC = () => {
     }
   }, [currentUser]);
 
-  // Gentle Reminder Logic
   const checkReminders = useCallback(() => {
     if (!currentUser || !currentUser.reminderSettings?.enabled) return;
-
     const triggered = JSON.parse(localStorage.getItem(STORAGE_KEYS.TRIGGERED_REMS) || '{}');
     const newNotifications: AppNotification[] = [];
     const now = new Date();
@@ -136,8 +124,7 @@ const App: React.FC = () => {
 
     entries.forEach(entry => {
       if (!entry.dueDate || [TransactionStatus.FULFILLED, TransactionStatus.FORGIVEN, TransactionStatus.CHARITY].includes(entry.status)) return;
-      
-      const isMyResponsibility = entry.creatorId === currentUser.id && entry.direction === Direction.I_OWE;
+      const isMyResponsibility = (entry.creatorId === currentUser.id && entry.direction === Direction.I_OWE) || (entry.targetUserId === currentUser.id && entry.direction === Direction.OWED_TO_ME);
       if (!isMyResponsibility) return;
 
       const dueDate = new Date(entry.dueDate);
@@ -149,6 +136,7 @@ const App: React.FC = () => {
         if (diffDays <= days && diffDays > 0 && currentUser.reminderSettings?.[key] && !triggered[triggerKey]) {
           newNotifications.push({
             id: `notif-${Math.random().toString(36).substr(2, 9)}`,
+            userId: currentUser.id,
             entryId: entry.id,
             title: 'Gentle Reminder',
             message: diffDays === 1 
@@ -160,7 +148,6 @@ const App: React.FC = () => {
           triggered[triggerKey] = true;
         }
       };
-
       checkInterval(7, 'sevenDay');
       checkInterval(1, 'oneDay');
     });
@@ -175,35 +162,32 @@ const App: React.FC = () => {
     checkReminders();
   }, [checkReminders]);
 
-  const handleLogin = (email: string, password: string) => {
-    const user = registeredUsers.find(u => u.email === email && u.password === password);
-    if (user) {
-      setCurrentUser(user);
-      setAuthError(null);
-    } else {
-      setAuthError('Invalid email or password.');
-    }
-  };
-
-  const handleSignUp = (user: User) => {
-    if (registeredUsers.find(u => u.email === user.email)) {
-      setAuthError('Email already exists.');
-      return;
-    }
-    const userWithDefaults = {
-      ...user,
-      reminderSettings: { enabled: true, sevenDay: true, oneDay: true }
-    };
-    setRegisteredUsers(prev => [...prev, userWithDefaults]);
-    setCurrentUser(userWithDefaults);
-    setAuthError(null);
-  };
-
   const handleUpdateStatus = (id: string, status: TransactionStatus) => {
     const resolved = [TransactionStatus.FULFILLED, TransactionStatus.FORGIVEN, TransactionStatus.CHARITY].includes(status);
+    if (status === TransactionStatus.FORGIVEN && currentUser) {
+      const entry = entries.find(e => e.id === id);
+      if (entry) {
+        const debtorId = (entry.creatorId === currentUser.id && entry.direction === Direction.I_OWE) ? entry.creatorId : entry.targetUserId;
+        const isCurrentCreditor = (entry.creatorId === currentUser.id && entry.direction === Direction.OWED_TO_ME) || (entry.targetUserId === currentUser.id && entry.direction === Direction.I_OWE);
+        if (isCurrentCreditor && debtorId) {
+          setNotifications(prev => [{
+            id: `notif-${Math.random().toString(36).substr(2, 9)}`,
+            userId: debtorId,
+            entryId: entry.id,
+            title: 'Act of Grace',
+            message: `The trust for ${entry.amount} with ${currentUser.name} has been forgiven and cleared.`,
+            createdAt: new Date().toISOString(),
+            isRead: false
+          }, ...prev]);
+        }
+      }
+    }
+
     setEntries(prev => prev.map(e => e.id === id ? { 
       ...e, 
       status, 
+      isConfirmed: status === TransactionStatus.CONFIRMED ? true : e.isConfirmed,
+      confirmedAt: status === TransactionStatus.CONFIRMED ? new Date().toISOString() : e.confirmedAt,
       resolvedAt: resolved ? new Date().toISOString() : e.resolvedAt,
       remainingAmount: status === TransactionStatus.FULFILLED ? 0 : e.remainingAmount
     } : e));
@@ -214,13 +198,8 @@ const App: React.FC = () => {
       if (e.id === id && e.numericAmount !== undefined) {
         const currentRemaining = e.remainingAmount ?? e.numericAmount;
         const newRemaining = Math.max(0, currentRemaining - paymentAmount);
-        const newPayment: PaymentRecord = {
-          id: Math.random().toString(36).substr(2, 9),
-          amount: paymentAmount,
-          date: new Date().toISOString()
-        };
+        const newPayment: PaymentRecord = { id: Math.random().toString(36).substr(2, 9), amount: paymentAmount, date: new Date().toISOString() };
         const isNowFulfilled = newRemaining <= 0;
-        
         return {
           ...e,
           remainingAmount: newRemaining,
@@ -233,16 +212,9 @@ const App: React.FC = () => {
     }));
   };
 
-  const handleDeleteEntry = (id: string) => {
-    setEntries(prev => prev.filter(e => e.id !== id));
-  };
-
-  const handleMarkNotifRead = (id: string) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
-  };
-
-  const handleClearNotifications = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+  const handleViewDetail = (id: string) => {
+    setSelectedEntryId(id);
+    setActiveTab('record-detail');
   };
 
   return (
@@ -251,27 +223,50 @@ const App: React.FC = () => {
       currentUser={currentUser} onLogout={() => setCurrentUser(null)}
       theme={theme} toggleTheme={() => setTheme(prev => prev === 'light' ? 'dark' : 'light')}
       notifications={notifications}
-      onMarkRead={handleMarkNotifRead}
-      onClearAll={handleClearNotifications}
+      onMarkRead={(id) => setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n))}
+      onClearAll={() => setNotifications(prev => prev.map(n => ({ ...n, isRead: true })))}
     >
       {!currentUser ? (
-        <Login onLogin={handleLogin} onSignUp={handleSignUp} error={authError} theme={theme} toggleTheme={() => setTheme(prev => prev === 'light' ? 'dark' : 'light')} />
+        <Login onLogin={(e, p) => {
+          const u = registeredUsers.find(u => u.email === e && u.password === p);
+          if (u) { setCurrentUser(u); setAuthError(null); } else { setAuthError('Invalid email or password.'); }
+        }} onSignUp={(u) => {
+          if (registeredUsers.find(old => old.email === u.email)) { setAuthError('Email already exists.'); return; }
+          const uWithRem = { ...u, reminderSettings: { enabled: true, sevenDay: true, oneDay: true } };
+          setRegisteredUsers(prev => [...prev, uWithRem]); setCurrentUser(uWithRem); setAuthError(null);
+        }} error={authError} theme={theme} toggleTheme={() => setTheme(prev => prev === 'light' ? 'dark' : 'light')} />
       ) : (
         <>
           {activeTab === 'ledger' && (
             <Dashboard 
-              entries={entries} 
-              currentUser={currentUser} 
-              users={registeredUsers} 
+              entries={entries} currentUser={currentUser} users={registeredUsers} 
               onUpdateStatus={handleUpdateStatus} 
               onConfirmEntry={(id) => handleUpdateStatus(id, TransactionStatus.CONFIRMED)} 
               onPartialPayment={handlePartialPayment}
               onAddEntry={() => setActiveTab('new-entry')} 
+              onViewDetail={handleViewDetail}
             />
           )}
-          {activeTab === 'new-entry' && <LedgerForm onAdd={(e) => { setEntries([e, ...entries]); setActiveTab('ledger'); }} onCancel={() => setActiveTab('ledger')} currentUser={currentUser} users={registeredUsers} />}
-          {activeTab === 'history' && <AmanahHistory entries={entries} currentUser={currentUser} users={registeredUsers} onDeleteEntry={handleDeleteEntry} />}
-          {activeTab === 'settings' && <Settings currentUser={currentUser} onUpdateUser={(u) => { setRegisteredUsers(prev => prev.map(old => old.id === u.id ? u : old)); setCurrentUser(u); }} />}
+          {activeTab === 'new-entry' && (
+            <LedgerForm onAdd={(e) => { setEntries([e, ...entries]); setActiveTab('ledger'); }} onCancel={() => setActiveTab('ledger')} currentUser={currentUser} users={registeredUsers} />
+          )}
+          {activeTab === 'history' && (
+            <AmanahHistory entries={entries} currentUser={currentUser} users={registeredUsers} onDeleteEntry={(id) => setEntries(prev => prev.filter(e => e.id !== id))} onViewDetail={handleViewDetail} />
+          )}
+          {activeTab === 'settings' && (
+            <Settings currentUser={currentUser} onUpdateUser={(u) => { setRegisteredUsers(prev => prev.map(old => old.id === u.id ? u : old)); setCurrentUser(u); }} />
+          )}
+          {activeTab === 'record-detail' && selectedEntryId && (
+            <RecordDetail 
+              entryId={selectedEntryId} 
+              entries={entries} 
+              currentUser={currentUser} 
+              users={registeredUsers}
+              onBack={() => setActiveTab('ledger')}
+              onUpdateStatus={handleUpdateStatus}
+              onPartialPayment={handlePartialPayment}
+            />
+          )}
         </>
       )}
     </Layout>

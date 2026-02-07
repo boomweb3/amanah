@@ -34,6 +34,7 @@ export interface User {
 
 export interface AppNotification {
   id: string;
+  userId: string; // Target recipient
   entryId: string;
   title: string;
   message: string;
@@ -62,7 +63,9 @@ export interface LedgerEntry {
   dueDate?: string;
   notes: string;
   isConfirmed: boolean;
+  requireVerification: boolean; // NEW: conditional lock
   createdAt: string;
+  confirmedAt?: string; // NEW: tracking verification date
   resolvedAt?: string;
 }
 

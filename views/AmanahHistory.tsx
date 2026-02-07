@@ -8,9 +8,10 @@ interface AmanahHistoryProps {
   currentUser: User;
   users: User[];
   onDeleteEntry: (id: string) => void;
+  onViewDetail: (id: string) => void;
 }
 
-const AmanahHistory: React.FC<AmanahHistoryProps> = ({ entries, currentUser, users, onDeleteEntry }) => {
+const AmanahHistory: React.FC<AmanahHistoryProps> = ({ entries, currentUser, users, onDeleteEntry, onViewDetail }) => {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const resolvedEntries = useMemo(() => {
@@ -102,6 +103,7 @@ const AmanahHistory: React.FC<AmanahHistoryProps> = ({ entries, currentUser, use
                     entry={entry} 
                     currentUser={currentUser} 
                     onDeleteClick={() => setDeleteConfirmId(entry.id)}
+                    onViewDetail={() => onViewDetail(entry.id)}
                   />
                 ))}
               </div>
@@ -134,15 +136,17 @@ const AmanahHistory: React.FC<AmanahHistoryProps> = ({ entries, currentUser, use
   );
 };
 
-const HistoryItem = ({ entry, currentUser, onDeleteClick }: { entry: LedgerEntry, currentUser: User, onDeleteClick: () => void }) => {
+const HistoryItem = ({ entry, currentUser, onDeleteClick, onViewDetail }: any) => {
   const isCreator = entry.creatorId === currentUser.id;
   const role = (isCreator && entry.direction === Direction.I_OWE) || (!isCreator && entry.direction === Direction.OWED_TO_ME) ? 'My Responsibility' : 'My Trust';
   const displayName = entry.partnerName;
-  
   const formatDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 
   return (
-    <div className="bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-6 group transition-all hover:border-emerald-100 dark:hover:border-emerald-900/40 relative">
+    <div 
+      onClick={onViewDetail}
+      className="bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-6 group transition-all hover:border-emerald-100 dark:hover:border-emerald-900/40 relative cursor-pointer"
+    >
       <div className="flex items-center gap-4">
         <GeneratedAvatar seed={displayName} size="md" className="rounded-2xl" />
         <div>
@@ -160,7 +164,7 @@ const HistoryItem = ({ entry, currentUser, onDeleteClick }: { entry: LedgerEntry
           <span className="text-emerald-700 dark:text-emerald-400">{formatDate(entry.resolvedAt || entry.createdAt)}</span>
         </div>
       </div>
-      <div className="flex flex-col items-end gap-3">
+      <div className="flex flex-col items-end gap-3" onClick={(e) => e.stopPropagation()}>
         <span className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full ${
           entry.status === TransactionStatus.FULFILLED ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600' :
           entry.status === TransactionStatus.FORGIVEN ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600' :

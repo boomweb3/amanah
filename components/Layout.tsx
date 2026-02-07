@@ -24,7 +24,9 @@ const Layout: React.FC<LayoutProps> = ({
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isNotifOpen, setIsNotifOpen] = useState(false);
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  // Filter notifications for current user
+  const userNotifications = notifications.filter(n => n.userId === currentUser?.id);
+  const unreadCount = userNotifications.filter(n => !n.isRead).length;
 
   const handleTabChange = (tab: AppTab) => {
     setActiveTab(tab);
@@ -127,7 +129,7 @@ const Layout: React.FC<LayoutProps> = ({
           </header>
           
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
-            {notifications.length === 0 ? (
+            {userNotifications.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center p-8">
                 <div className="w-16 h-16 bg-slate-50 dark:bg-slate-800 rounded-2xl flex items-center justify-center mb-4 text-slate-200">
                   <i className="fa-solid fa-bell-slash text-2xl"></i>
@@ -135,7 +137,7 @@ const Layout: React.FC<LayoutProps> = ({
                 <p className="text-slate-400 text-xs font-black uppercase tracking-widest leading-loose">No active reminders.<br/>Peace of mind is a gift.</p>
               </div>
             ) : (
-              notifications.map(n => (
+              userNotifications.map(n => (
                 <div 
                   key={n.id} 
                   className={`p-5 rounded-2xl border transition-all ${n.isRead ? 'bg-slate-50/50 dark:bg-slate-800/30 border-slate-100 dark:border-slate-800 opacity-60' : 'bg-emerald-50/20 dark:bg-emerald-900/10 border-emerald-100 dark:border-emerald-800'}`}
@@ -153,7 +155,7 @@ const Layout: React.FC<LayoutProps> = ({
             )}
           </div>
 
-          {notifications.length > 0 && (
+          {userNotifications.length > 0 && (
             <footer className="p-6 border-t border-slate-100 dark:border-slate-800">
               <button onClick={onClearAll} className="w-full py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-200 transition-colors">
                 Clear all records

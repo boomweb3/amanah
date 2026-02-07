@@ -17,10 +17,10 @@ const LedgerForm: React.FC<LedgerFormProps> = ({ onAdd, onCancel, currentUser, u
     type: TransactionType.DEBT,
     direction: Direction.I_OWE,
     notes: '',
-    dueDate: ''
+    dueDate: '',
+    requireVerification: true
   });
 
-  // Suggest existing names from registered users or previous contacts
   const suggestions = useMemo(() => {
     return users.filter(u => u.id !== currentUser.id).map(u => u.name);
   }, [users, currentUser.id]);
@@ -29,16 +29,11 @@ const LedgerForm: React.FC<LedgerFormProps> = ({ onAdd, onCancel, currentUser, u
     e.preventDefault();
     if (!partnerName.trim()) return;
 
-    // Check if the name matches a registered user for optional verification linkage
     const matchedUser = users.find(u => u.name.toLowerCase() === partnerName.trim().toLowerCase());
-
-    // Try to extract numeric value if it's a financial debt
     let numericAmount: number | undefined = undefined;
     if (formData.type === TransactionType.DEBT) {
       const parsed = parseFloat(formData.amount.replace(/[^0-9.]/g, ''));
-      if (!isNaN(parsed)) {
-        numericAmount = parsed;
-      }
+      if (!isNaN(parsed)) { numericAmount = parsed; }
     }
 
     const entry: LedgerEntry = {
@@ -50,8 +45,9 @@ const LedgerForm: React.FC<LedgerFormProps> = ({ onAdd, onCancel, currentUser, u
       numericAmount,
       remainingAmount: numericAmount,
       paymentLog: numericAmount !== undefined ? [] : undefined,
-      status: matchedUser ? TransactionStatus.PENDING : TransactionStatus.CONFIRMED,
-      isConfirmed: matchedUser ? false : true,
+      // If verification is NOT required, start as confirmed immediately
+      status: !formData.requireVerification ? TransactionStatus.CONFIRMED : TransactionStatus.PENDING,
+      isConfirmed: !formData.requireVerification,
       createdAt: new Date().toISOString()
     };
     onAdd(entry);
@@ -78,23 +74,11 @@ const LedgerForm: React.FC<LedgerFormProps> = ({ onAdd, onCancel, currentUser, u
                 <GeneratedAvatar seed={partnerName || 'placeholder'} size="lg" className="rounded-[2rem] shadow-lg" />
               </div>
               <div className="flex-1 w-full relative">
-                <input 
-                  required 
-                  type="text" 
-                  list="partner-suggestions"
-                  value={partnerName} 
-                  onChange={(e) => setPartnerName(e.target.value)} 
-                  placeholder="Enter full name..." 
-                  className="w-full px-8 py-5 bg-slate-50 dark:bg-slate-950 border-2 border-transparent focus:border-emerald-600 rounded-[2rem] outline-none font-bold text-slate-700 dark:text-slate-200 transition-all text-xl" 
-                />
+                <input required type="text" list="partner-suggestions" value={partnerName} onChange={(e) => setPartnerName(e.target.value)} placeholder="Enter full name..." className="w-full px-8 py-5 bg-slate-50 dark:bg-slate-950 border-2 border-transparent focus:border-emerald-600 rounded-[2rem] outline-none font-bold text-slate-700 dark:text-slate-200 transition-all text-xl" />
                 <datalist id="partner-suggestions">
                   {suggestions.map(name => <option key={name} value={name} />)}
                 </datalist>
-                {partnerName && (
-                   <p className="absolute -bottom-6 left-6 text-[9px] font-black text-emerald-600 uppercase tracking-widest animate-fadeIn">
-                     Identity pattern generated
-                   </p>
-                )}
+                {partnerName && <p className="absolute -bottom-6 left-6 text-[9px] font-black text-emerald-600 uppercase tracking-widest animate-fadeIn">Identity pattern generated</p>}
               </div>
             </div>
           </div>
@@ -103,17 +87,8 @@ const LedgerForm: React.FC<LedgerFormProps> = ({ onAdd, onCancel, currentUser, u
             <div className="space-y-3">
               <label className="block text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Value / Amount</label>
               <div className="relative">
-                {formData.type === TransactionType.DEBT && (
-                  <span className="absolute left-8 top-1/2 -translate-y-1/2 font-black text-slate-300">₦</span>
-                )}
-                <input 
-                  required 
-                  type="text" 
-                  value={formData.amount} 
-                  onChange={(e) => setFormData({...formData, amount: e.target.value})} 
-                  className={`w-full ${formData.type === TransactionType.DEBT ? 'pl-12 pr-8' : 'px-8'} py-5 bg-slate-50 dark:bg-slate-950 border-2 border-transparent focus:border-emerald-600 rounded-[2rem] outline-none font-bold text-slate-700 dark:text-slate-200`} 
-                  placeholder={formData.type === TransactionType.DEBT ? "0.00" : "Description of item"} 
-                />
+                {formData.type === TransactionType.DEBT && <span className="absolute left-8 top-1/2 -translate-y-1/2 font-black text-slate-300">₦</span>}
+                <input required type="text" value={formData.amount} onChange={(e) => setFormData({...formData, amount: e.target.value})} className={`w-full ${formData.type === TransactionType.DEBT ? 'pl-12 pr-8' : 'px-8'} py-5 bg-slate-50 dark:bg-slate-950 border-2 border-transparent focus:border-emerald-600 rounded-[2rem] outline-none font-bold text-slate-700 dark:text-slate-200`} placeholder={formData.type === TransactionType.DEBT ? "0.00" : "Description of item"} />
               </div>
             </div>
             <div className="space-y-3">
@@ -125,26 +100,32 @@ const LedgerForm: React.FC<LedgerFormProps> = ({ onAdd, onCancel, currentUser, u
             </div>
           </div>
 
+          <div className="space-y-3 p-6 bg-slate-50 dark:bg-slate-950/50 rounded-[2rem] border border-slate-100 dark:border-slate-800">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-black text-slate-700 dark:text-slate-200 uppercase tracking-tight">Require Verification</p>
+                <p className="text-[10px] text-slate-500 font-medium">Creditor must confirm before any repayment can be recorded.</p>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setFormData({...formData, requireVerification: !formData.requireVerification})}
+                className={`w-14 h-7 rounded-full transition-all relative flex-shrink-0 ${formData.requireVerification ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+              >
+                <div className={`absolute top-1 w-5 h-5 bg-white rounded-full shadow-md transition-all ${formData.requireVerification ? 'left-8' : 'left-1'}`}></div>
+              </button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-3">
               <label className="block text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Fulfillment Target (Optional)</label>
-              <input 
-                type="date" 
-                value={formData.dueDate} 
-                onChange={(e) => setFormData({...formData, dueDate: e.target.value})} 
-                className="w-full px-8 py-5 bg-slate-50 dark:bg-slate-950 border-2 border-transparent focus:border-emerald-600 rounded-[2rem] outline-none font-bold text-slate-700 dark:text-slate-200" 
-              />
+              <input type="date" value={formData.dueDate} onChange={(e) => setFormData({...formData, dueDate: e.target.value})} className="w-full px-8 py-5 bg-slate-50 dark:bg-slate-950 border-2 border-transparent focus:border-emerald-600 rounded-[2rem] outline-none font-bold text-slate-700 dark:text-slate-200" />
             </div>
           </div>
 
           <div className="space-y-3">
             <label className="block text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] ml-2">Context (Optional)</label>
-            <textarea 
-              value={formData.notes} 
-              onChange={(e) => setFormData({...formData, notes: e.target.value})} 
-              className="w-full px-8 py-5 bg-slate-50 dark:bg-slate-950 border-2 border-transparent focus:border-emerald-600 rounded-[2rem] outline-none font-bold text-slate-700 dark:text-slate-200 resize-none h-32" 
-              placeholder="What is this for?"
-            />
+            <textarea value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} className="w-full px-8 py-5 bg-slate-50 dark:bg-slate-950 border-2 border-transparent focus:border-emerald-600 rounded-[2rem] outline-none font-bold text-slate-700 dark:text-slate-200 resize-none h-32" placeholder="What is this for?" />
           </div>
 
           <div className="flex gap-6 pt-8">
