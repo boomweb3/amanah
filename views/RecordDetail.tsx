@@ -23,6 +23,8 @@ const RecordDetail: React.FC<RecordDetailProps> = ({ entryId, entries, currentUs
   const isDebtor = !isCreditor;
   const isMonetaryDebt = entry.type === TransactionType.DEBT && entry.numericAmount !== undefined;
   const partnerName = isCreator ? entry.partnerName : (users.find(u => u.id === entry.creatorId)?.name || "Partner");
+  
+  // Verification lock: If verification is required, debtor cannot record payment until creditor confirms
   const isLocked = entry.requireVerification && !entry.isConfirmed && isDebtor;
 
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -169,36 +171,54 @@ const RecordDetail: React.FC<RecordDetailProps> = ({ entryId, entries, currentUs
                   )}
 
                   <div className="grid grid-cols-1 gap-4">
-                    {isDebtor ? (
+                    {/* Primary Actions: Available to both Creditor and Debtor */}
+                    <button 
+                      disabled={isLocked} 
+                      onClick={handleFulfill} 
+                      className="w-full py-5 bg-emerald-800 dark:bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-emerald-900/10 active:scale-95 disabled:opacity-20 transition-all"
+                    >
+                      Mark Fully Honored
+                    </button>
+                    
+                    {isMonetaryDebt && (
                       <>
-                        <button disabled={isLocked} onClick={handleFulfill} className="w-full py-5 bg-emerald-800 dark:bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-emerald-900/10 active:scale-95 disabled:opacity-20 transition-all">Mark Fully Honored</button>
-                        {isMonetaryDebt && (
-                          <>
-                            {!showPaymentInput ? (
-                              <button disabled={isLocked} onClick={() => setShowPaymentInput(true)} className="w-full py-5 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-2 border-slate-100 dark:border-slate-700 rounded-2xl font-black uppercase tracking-widest text-xs active:scale-95 disabled:opacity-20 transition-all">Record Partial Payment</button>
-                            ) : (
-                              <form onSubmit={handlePaymentSubmit} className="space-y-4 p-6 bg-slate-50 dark:bg-slate-950/50 rounded-2xl animate-fadeIn">
-                                <div className="relative">
-                                  <span className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-slate-300">₦</span>
-                                  <input autoFocus type="number" step="0.01" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} className="w-full pl-12 pr-6 py-4 rounded-xl border border-slate-200 outline-none font-black text-lg text-slate-700 dark:text-slate-100 bg-white dark:bg-slate-900" placeholder="0.00" />
-                                </div>
-                                <div className="flex gap-2">
-                                  <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-widest text-[9px]">Confirm Payment</button>
-                                  <button type="button" onClick={() => setShowPaymentInput(false)} className="px-4 py-3 text-slate-400 font-black uppercase tracking-widest text-[9px]">Cancel</button>
-                                </div>
-                              </form>
-                            )}
-                          </>
+                        {!showPaymentInput ? (
+                          <button 
+                            disabled={isLocked} 
+                            onClick={() => setShowPaymentInput(true)} 
+                            className="w-full py-5 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-2 border-slate-100 dark:border-slate-700 rounded-2xl font-black uppercase tracking-widest text-xs active:scale-95 disabled:opacity-20 transition-all"
+                          >
+                            Record Partial Payment
+                          </button>
+                        ) : (
+                          <form onSubmit={handlePaymentSubmit} className="space-y-4 p-6 bg-slate-50 dark:bg-slate-950/50 rounded-2xl animate-fadeIn">
+                            <div className="relative">
+                              <span className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-slate-300">₦</span>
+                              <input autoFocus type="number" step="0.01" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} className="w-full pl-12 pr-6 py-4 rounded-xl border border-slate-200 outline-none font-black text-lg text-slate-700 dark:text-slate-100 bg-white dark:bg-slate-900" placeholder="0.00" />
+                            </div>
+                            <div className="flex gap-2">
+                              <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-widest text-[9px]">Confirm Payment</button>
+                              <button type="button" onClick={() => setShowPaymentInput(false)} className="px-4 py-3 text-slate-400 font-black uppercase tracking-widest text-[9px]">Cancel</button>
+                            </div>
+                          </form>
                         )}
                       </>
-                    ) : (
-                      <button onClick={handleForgive} className="w-full py-5 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-2 border-slate-100 dark:border-slate-700 rounded-2xl font-black uppercase tracking-widest text-xs active:scale-95 transition-all">Forgive Debt</button>
+                    )}
+
+                    {/* Secondary Actions: Forgive is exclusive to the Creditor */}
+                    {isCreditor && (
+                      <button 
+                        onClick={handleForgive} 
+                        className="w-full py-5 mt-4 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-2 border-slate-100 dark:border-slate-700 rounded-2xl font-black uppercase tracking-widest text-xs active:scale-95 transition-all"
+                      >
+                        Forgive Debt (Act of Grace)
+                      </button>
                     )}
                   </div>
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {isRetractEligible && isDebtor && (
+                  {isRetractEligible && (
                     <button 
                       onClick={() => setShowRetractConfirm(true)}
                       className="w-full py-5 bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-500 border-2 border-amber-100 dark:border-amber-900/30 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-amber-100 transition-all"
