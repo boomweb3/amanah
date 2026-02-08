@@ -14,14 +14,12 @@ const FALLBACK_QUOTES = [
  * Sanitizes input to handle common AI markdown formatting issues.
  */
 export const getEthicalInspiration = async (): Promise<string[]> => {
-  const apiKey = process.env.API_KEY;
-  
-  // If no key or placeholder, return fallback immediately to avoid console errors
-  if (!apiKey || apiKey === 'PLACEHOLDER_API_KEY') {
+  // Always use a new GoogleGenAI instance with the latest API_KEY from process.env
+  if (!process.env.API_KEY || process.env.API_KEY === 'PLACEHOLDER_API_KEY') {
     return FALLBACK_QUOTES;
   }
 
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   try {
     const response = await ai.models.generateContent({

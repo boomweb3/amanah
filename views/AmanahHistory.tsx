@@ -54,9 +54,11 @@ const AmanahHistory: React.FC<AmanahHistoryProps> = ({ entries, currentUser, use
 
   return (
     <div className="space-y-12 animate-fadeIn pb-24">
-      <header>
-        <h1 className="text-5xl font-black text-slate-900 dark:text-slate-100 tracking-tighter mb-2">Amānah History</h1>
-        <p className="text-slate-500 dark:text-slate-400 text-lg font-medium">A reflective record of honored commitments and shared grace.</p>
+      <header className="flex flex-col gap-2">
+        <h1 className="text-3xl md:text-5xl font-black text-slate-900 dark:text-slate-100 tracking-tighter whitespace-nowrap overflow-visible leading-none">
+          Amānah History
+        </h1>
+        <p className="text-slate-500 dark:text-slate-400 text-base md:text-lg font-medium">A reflective record of honored commitments and shared grace.</p>
       </header>
 
       <section className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-12 border border-slate-100 dark:border-slate-800 shadow-sm relative overflow-hidden transition-all">

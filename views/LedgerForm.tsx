@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { LedgerEntry, TransactionType, TransactionStatus, Direction, User } from '../types';
 import GeneratedAvatar from '../components/GeneratedAvatar';
 
@@ -20,10 +20,6 @@ const LedgerForm: React.FC<LedgerFormProps> = ({ onAdd, onCancel, currentUser, u
     dueDate: '',
     requireVerification: true
   });
-
-  const suggestions = useMemo(() => {
-    return users.filter(u => u.id !== currentUser.id).map(u => u.name);
-  }, [users, currentUser.id]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,10 +70,7 @@ const LedgerForm: React.FC<LedgerFormProps> = ({ onAdd, onCancel, currentUser, u
                 <GeneratedAvatar seed={partnerName || 'placeholder'} size="lg" className="rounded-[2rem] shadow-lg" />
               </div>
               <div className="flex-1 w-full relative">
-                <input required type="text" list="partner-suggestions" value={partnerName} onChange={(e) => setPartnerName(e.target.value)} placeholder="Enter full name..." className="w-full px-8 py-5 bg-slate-50 dark:bg-slate-950 border-2 border-transparent focus:border-emerald-600 rounded-[2rem] outline-none font-bold text-slate-700 dark:text-slate-200 transition-all text-xl" />
-                <datalist id="partner-suggestions">
-                  {suggestions.map(name => <option key={name} value={name} />)}
-                </datalist>
+                <input required type="text" value={partnerName} onChange={(e) => setPartnerName(e.target.value)} placeholder="Enter partner's full name..." className="w-full px-8 py-5 bg-slate-50 dark:bg-slate-950 border-2 border-transparent focus:border-emerald-600 rounded-[2rem] outline-none font-bold text-slate-700 dark:text-slate-200 transition-all text-xl" />
                 {partnerName && <p className="absolute -bottom-6 left-6 text-[9px] font-black text-emerald-600 uppercase tracking-widest animate-fadeIn">Identity pattern generated</p>}
               </div>
             </div>

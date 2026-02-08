@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { LedgerEntry, TransactionStatus, TransactionType, Direction, User, AppNotification, ReminderSettings, PaymentRecord } from './types';
+import { LedgerEntry, TransactionStatus, TransactionType, Direction, User, AppNotification, ReminderSettings, PaymentRecord, RetractionRecord } from './types';
 import Dashboard from './views/Dashboard';
 import LedgerForm from './views/LedgerForm';
 import Login from './views/Login';
@@ -19,33 +19,9 @@ const STORAGE_KEYS = {
   TRIGGERED_REMS: 'amaanah_triggered_reminders'
 };
 
-const INITIAL_USERS: User[] = [
-  { id: 'user-1', name: 'Omar Farooq', email: 'omar@example.com', password: 'password', reminderSettings: { enabled: true, sevenDay: true, oneDay: true } },
-  { id: 'user-2', name: 'Fatima Zahra', email: 'fatima@example.com', password: 'password', reminderSettings: { enabled: true, sevenDay: true, oneDay: true } },
-  { id: 'user-3', name: 'John Doe', email: 'john@example.com', password: 'password', reminderSettings: { enabled: true, sevenDay: true, oneDay: true } },
-  { id: 'user-4', name: 'Zainab Ahmed', email: 'zainab@example.com', password: 'password', reminderSettings: { enabled: true, sevenDay: true, oneDay: true } },
-];
+const INITIAL_USERS: User[] = [];
 
-const INITIAL_ENTRIES: LedgerEntry[] = [
-  {
-    id: 'entry-1',
-    creatorId: 'user-1',
-    targetUserId: 'user-3',
-    partnerName: 'John Doe',
-    amount: '₦250',
-    numericAmount: 250,
-    remainingAmount: 250,
-    paymentLog: [],
-    type: TransactionType.DEBT,
-    direction: Direction.I_OWE,
-    status: TransactionStatus.CONFIRMED,
-    dueDate: new Date(Date.now() + 86400000 * 5).toISOString().split('T')[0],
-    notes: 'Car repair loan - mutual agreement.',
-    isConfirmed: true,
-    requireVerification: true,
-    createdAt: new Date().toISOString()
-  }
-];
+const INITIAL_ENTRIES: LedgerEntry[] = [];
 
 export type AppTab = 'ledger' | 'new-entry' | 'history' | 'settings' | 'record-detail';
 
@@ -187,7 +163,7 @@ const App: React.FC = () => {
       ...e, 
       status, 
       isConfirmed: status === TransactionStatus.CONFIRMED ? true : e.isConfirmed,
-      confirmedAt: status === TransactionStatus.CONFIRMED ? new Date().toISOString() : e.confirmedAt,
+      confirmedAt: (status === TransactionStatus.CONFIRMED || status === TransactionStatus.PARTIALLY_FULFILLED) ? (e.confirmedAt || new Date().toISOString()) : e.confirmedAt,
       resolvedAt: resolved ? new Date().toISOString() : e.resolvedAt,
       remainingAmount: status === TransactionStatus.FULFILLED ? 0 : e.remainingAmount
     } : e));
@@ -204,8 +180,60 @@ const App: React.FC = () => {
           ...e,
           remainingAmount: newRemaining,
           paymentLog: [...(e.paymentLog || []), newPayment],
-          status: isNowFulfilled ? TransactionStatus.FULFILLED : e.status,
+          status: isNowFulfilled ? TransactionStatus.FULFILLED : TransactionStatus.PARTIALLY_FULFILLED,
           resolvedAt: isNowFulfilled ? new Date().toISOString() : e.resolvedAt
+        };
+      }
+      return e;
+    }));
+  };
+
+  const handleRetractResolution = (id: string) => {
+    if (!currentUser) return;
+    
+    setEntries(prev => prev.map(e => {
+      if (e.id === id) {
+        // Eligibility check
+        if (![TransactionStatus.FULFILLED, TransactionStatus.PARTIALLY_FULFILLED].includes(e.status)) return e;
+
+        const previousStatus = e.status;
+        const newRetraction: RetractionRecord = {
+          id: `retract-${Math.random().toString(36).substr(2, 9)}`,
+          date: new Date().toISOString(),
+          previousStatus,
+          initiatorId: currentUser.id
+        };
+
+        // Recalculate remaining amount from scratch to ensure consistency
+        // (total amount minus non-reverted payments)
+        let newRemaining = e.numericAmount ?? 0;
+        if (e.numericAmount !== undefined && e.paymentLog) {
+          const totalPaid = e.paymentLog
+            .filter(p => !p.isReverted)
+            .reduce((acc, p) => acc + p.amount, 0);
+          newRemaining = Math.max(0, e.numericAmount - totalPaid);
+        }
+
+        // Send notification to partner
+        const partnerId = (e.creatorId === currentUser.id) ? e.targetUserId : e.creatorId;
+        if (partnerId) {
+          setNotifications(prevN => [{
+            id: `notif-${Math.random().toString(36).substr(2, 9)}`,
+            userId: partnerId,
+            entryId: e.id,
+            title: 'Ledger Update',
+            message: `The resolution for the trust for ${e.amount} has been retracted for adjustment.`,
+            createdAt: new Date().toISOString(),
+            isRead: false
+          }, ...prevN]);
+        }
+
+        return {
+          ...e,
+          status: newRemaining > 0 ? (e.paymentLog && e.paymentLog.filter(p => !p.isReverted).length > 0 ? TransactionStatus.PARTIALLY_FULFILLED : TransactionStatus.CONFIRMED) : TransactionStatus.FULFILLED,
+          remainingAmount: newRemaining,
+          resolvedAt: undefined,
+          retractionHistory: [...(e.retractionHistory || []), newRetraction]
         };
       }
       return e;
@@ -265,6 +293,7 @@ const App: React.FC = () => {
               onBack={() => setActiveTab('ledger')}
               onUpdateStatus={handleUpdateStatus}
               onPartialPayment={handlePartialPayment}
+              onRetractResolution={handleRetractResolution}
             />
           )}
         </>

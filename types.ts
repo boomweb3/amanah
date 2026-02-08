@@ -7,6 +7,7 @@ export enum TransactionType {
 export enum TransactionStatus {
   PENDING = 'Pending',
   CONFIRMED = 'Confirmed',
+  PARTIALLY_FULFILLED = 'Partially Fulfilled',
   FULFILLED = 'Fulfilled',
   FORGIVEN = 'Forgiven',
   CHARITY = 'Converted to Charity'
@@ -46,6 +47,15 @@ export interface PaymentRecord {
   id: string;
   amount: number;
   date: string;
+  isReverted?: boolean;
+  revertedAt?: string;
+}
+
+export interface RetractionRecord {
+  id: string;
+  date: string;
+  previousStatus: TransactionStatus;
+  initiatorId: string;
 }
 
 export interface LedgerEntry {
@@ -57,15 +67,16 @@ export interface LedgerEntry {
   numericAmount?: number; // Internal numeric value for debts
   remainingAmount?: number; // Remaining balance
   paymentLog?: PaymentRecord[]; // History of partial payments
+  retractionHistory?: RetractionRecord[]; // History of undos
   type: TransactionType;
   direction: Direction;
   status: TransactionStatus;
   dueDate?: string;
   notes: string;
   isConfirmed: boolean;
-  requireVerification: boolean; // NEW: conditional lock
+  requireVerification: boolean; 
   createdAt: string;
-  confirmedAt?: string; // NEW: tracking verification date
+  confirmedAt?: string; 
   resolvedAt?: string;
 }
 

@@ -11,9 +11,10 @@ interface RecordDetailProps {
   onBack: () => void;
   onUpdateStatus: (id: string, status: TransactionStatus) => void;
   onPartialPayment: (id: string, amount: number) => void;
+  onRetractResolution: (id: string) => void;
 }
 
-const RecordDetail: React.FC<RecordDetailProps> = ({ entryId, entries, currentUser, users, onBack, onUpdateStatus, onPartialPayment }) => {
+const RecordDetail: React.FC<RecordDetailProps> = ({ entryId, entries, currentUser, users, onBack, onUpdateStatus, onPartialPayment, onRetractResolution }) => {
   const entry = entries.find(e => e.id === entryId);
   if (!entry) return <div className="p-20 text-center">Record not found.</div>;
 
@@ -26,6 +27,7 @@ const RecordDetail: React.FC<RecordDetailProps> = ({ entryId, entries, currentUs
 
   const [paymentAmount, setPaymentAmount] = useState('');
   const [showPaymentInput, setShowPaymentInput] = useState(false);
+  const [showRetractConfirm, setShowRetractConfirm] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
   const handleCopyLink = () => {
@@ -47,6 +49,13 @@ const RecordDetail: React.FC<RecordDetailProps> = ({ entryId, entries, currentUs
       setShowPaymentInput(false);
     }
   };
+
+  const handleRetract = () => {
+    onRetractResolution(entry.id);
+    setShowRetractConfirm(false);
+  };
+
+  const isRetractEligible = [TransactionStatus.FULFILLED, TransactionStatus.PARTIALLY_FULFILLED].includes(entry.status);
 
   const formatDate = (iso?: string) => iso ? new Date(iso).toLocaleDateString(undefined, { month: 'long', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Pending';
 
@@ -121,7 +130,17 @@ const RecordDetail: React.FC<RecordDetailProps> = ({ entryId, entries, currentUs
                 {entry.isConfirmed && <TimelinePoint date={formatDate(entry.confirmedAt)} label="Mutual Confirmation Received" active />}
                 
                 {entry.paymentLog?.map((p, idx) => (
-                  <TimelinePoint key={p.id} date={formatDate(p.date)} label={`Partial Payment: ₦${p.amount}`} active />
+                  <TimelinePoint 
+                    key={p.id} 
+                    date={formatDate(p.date)} 
+                    label={`Partial Payment: ₦${p.amount}${p.isReverted ? ' (Reverted)' : ''}`} 
+                    active 
+                    variant={p.isReverted ? 'amber' : 'emerald'}
+                  />
+                ))}
+
+                {entry.retractionHistory?.map((r, idx) => (
+                  <TimelinePoint key={r.id} date={formatDate(r.date)} label={`Resolution Retracted (${r.previousStatus})`} active variant="amber" />
                 ))}
 
                 {entry.resolvedAt && (
@@ -135,48 +154,62 @@ const RecordDetail: React.FC<RecordDetailProps> = ({ entryId, entries, currentUs
             </section>
 
             {/* ACTION SECTION */}
-            {!entry.resolvedAt && (
-              <section className="pt-8 border-t border-slate-100 dark:border-slate-800">
-                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8">Fulfillment Actions</h3>
-                
-                {isLocked && (
-                  <div className="mb-6 p-5 bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 rounded-2xl flex items-start gap-4">
-                    <i className="fa-solid fa-lock text-amber-600 mt-1"></i>
-                    <p className="text-[10px] text-amber-800 dark:text-amber-500 font-bold leading-relaxed uppercase tracking-widest">
-                      Repayment actions are locked until the creditor confirms this record.
-                    </p>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 gap-4">
-                  {isDebtor ? (
-                    <>
-                      <button disabled={isLocked} onClick={handleFulfill} className="w-full py-5 bg-emerald-800 dark:bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-emerald-900/10 active:scale-95 disabled:opacity-20 transition-all">Mark Fully Honored</button>
-                      {isMonetaryDebt && (
-                        <>
-                          {!showPaymentInput ? (
-                            <button disabled={isLocked} onClick={() => setShowPaymentInput(true)} className="w-full py-5 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-2 border-slate-100 dark:border-slate-700 rounded-2xl font-black uppercase tracking-widest text-xs active:scale-95 disabled:opacity-20 transition-all">Record Partial Payment</button>
-                          ) : (
-                            <form onSubmit={handlePaymentSubmit} className="space-y-4 p-6 bg-slate-50 dark:bg-slate-950/50 rounded-2xl animate-fadeIn">
-                              <div className="relative">
-                                <span className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-slate-300">₦</span>
-                                <input autoFocus type="number" step="0.01" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} className="w-full pl-12 pr-6 py-4 rounded-xl border border-slate-200 outline-none font-black text-lg" placeholder="0.00" />
-                              </div>
-                              <div className="flex gap-2">
-                                <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-widest text-[9px]">Confirm Payment</button>
-                                <button type="button" onClick={() => setShowPaymentInput(false)} className="px-4 py-3 text-slate-400 font-black uppercase tracking-widest text-[9px]">Cancel</button>
-                              </div>
-                            </form>
-                          )}
-                        </>
-                      )}
-                    </>
-                  ) : (
-                    <button onClick={handleForgive} className="w-full py-5 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-2 border-slate-100 dark:border-slate-700 rounded-2xl font-black uppercase tracking-widest text-xs active:scale-95 transition-all">Forgive Debt</button>
+            <section className="pt-8 border-t border-slate-100 dark:border-slate-800">
+              <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-8">Management Actions</h3>
+              
+              {!entry.resolvedAt ? (
+                <div className="space-y-4">
+                  {isLocked && (
+                    <div className="mb-6 p-5 bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 rounded-2xl flex items-start gap-4">
+                      <i className="fa-solid fa-lock text-amber-600 mt-1"></i>
+                      <p className="text-[10px] text-amber-800 dark:text-amber-500 font-bold leading-relaxed uppercase tracking-widest">
+                        Repayment actions are locked until the creditor confirms this record.
+                      </p>
+                    </div>
                   )}
+
+                  <div className="grid grid-cols-1 gap-4">
+                    {isDebtor ? (
+                      <>
+                        <button disabled={isLocked} onClick={handleFulfill} className="w-full py-5 bg-emerald-800 dark:bg-emerald-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-emerald-900/10 active:scale-95 disabled:opacity-20 transition-all">Mark Fully Honored</button>
+                        {isMonetaryDebt && (
+                          <>
+                            {!showPaymentInput ? (
+                              <button disabled={isLocked} onClick={() => setShowPaymentInput(true)} className="w-full py-5 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-2 border-slate-100 dark:border-slate-700 rounded-2xl font-black uppercase tracking-widest text-xs active:scale-95 disabled:opacity-20 transition-all">Record Partial Payment</button>
+                            ) : (
+                              <form onSubmit={handlePaymentSubmit} className="space-y-4 p-6 bg-slate-50 dark:bg-slate-950/50 rounded-2xl animate-fadeIn">
+                                <div className="relative">
+                                  <span className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-slate-300">₦</span>
+                                  <input autoFocus type="number" step="0.01" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} className="w-full pl-12 pr-6 py-4 rounded-xl border border-slate-200 outline-none font-black text-lg text-slate-700 dark:text-slate-100 bg-white dark:bg-slate-900" placeholder="0.00" />
+                                </div>
+                                <div className="flex gap-2">
+                                  <button type="submit" className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-black uppercase tracking-widest text-[9px]">Confirm Payment</button>
+                                  <button type="button" onClick={() => setShowPaymentInput(false)} className="px-4 py-3 text-slate-400 font-black uppercase tracking-widest text-[9px]">Cancel</button>
+                                </div>
+                              </form>
+                            )}
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      <button onClick={handleForgive} className="w-full py-5 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border-2 border-slate-100 dark:border-slate-700 rounded-2xl font-black uppercase tracking-widest text-xs active:scale-95 transition-all">Forgive Debt</button>
+                    )}
+                  </div>
                 </div>
-              </section>
-            )}
+              ) : (
+                <div className="space-y-4">
+                  {isRetractEligible && isDebtor && (
+                    <button 
+                      onClick={() => setShowRetractConfirm(true)}
+                      className="w-full py-5 bg-amber-50 dark:bg-amber-950/20 text-amber-700 dark:text-amber-500 border-2 border-amber-100 dark:border-amber-900/30 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-amber-100 transition-all"
+                    >
+                      Retract Resolution
+                    </button>
+                  )}
+                  <p className="text-[10px] text-slate-400 font-bold uppercase text-center tracking-widest italic">This record is currently resolved.</p>
+                </div>
+              )}
+            </section>
           </div>
         </div>
 
@@ -188,6 +221,29 @@ const RecordDetail: React.FC<RecordDetailProps> = ({ entryId, entries, currentUs
            </p>
         </footer>
       </div>
+
+      {showRetractConfirm && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
+          <div className="absolute inset-0 bg-slate-950/40 backdrop-blur-md" onClick={() => setShowRetractConfirm(false)}></div>
+          <div className="bg-white dark:bg-slate-900 w-full max-w-sm p-10 rounded-[3rem] shadow-2xl relative z-10 animate-scaleUp border border-slate-100 dark:border-slate-800 text-center">
+            <div className="w-16 h-16 bg-amber-50 dark:bg-amber-950/40 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
+              <i className="fa-solid fa-rotate-left text-2xl"></i>
+            </div>
+            <h3 className="text-xl font-black text-slate-900 dark:text-slate-100 mb-2">Retract Resolution?</h3>
+            <p className="text-slate-500 dark:text-slate-400 text-sm font-medium mb-8 leading-relaxed">
+              This will return the debt to an active state. The outstanding balance will be recalculated and your partner will be notified.
+            </p>
+            <div className="flex flex-col gap-3">
+              <button onClick={handleRetract} className="w-full py-4 bg-amber-600 text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl active:scale-95 transition-all">
+                Yes, Retract & Reopen
+              </button>
+              <button onClick={() => setShowRetractConfirm(false)} className="w-full py-4 text-slate-400 font-black uppercase tracking-widest text-xs hover:text-slate-600 transition-colors">
+                Go Back
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -199,9 +255,12 @@ const DetailRow = ({ label, value }: { label: string, value: string }) => (
   </div>
 );
 
-const TimelinePoint = ({ date, label, active = false, highlight = false }: { date: string, label: string, active?: boolean, highlight?: boolean }) => (
+const TimelinePoint = ({ date, label, active = false, highlight = false, variant = 'emerald' }: { date: string, label: string, active?: boolean, highlight?: boolean, variant?: 'emerald' | 'amber' }) => (
   <div className="relative">
-    <div className={`absolute -left-[36px] top-1 w-4 h-4 rounded-full border-4 border-white dark:border-slate-900 shadow-sm ${highlight ? 'bg-emerald-500 scale-125' : active ? 'bg-emerald-600' : 'bg-slate-200'}`}></div>
+    <div className={`absolute -left-[36px] top-1 w-4 h-4 rounded-full border-4 border-white dark:border-slate-900 shadow-sm ${
+      highlight ? 'bg-emerald-500 scale-125' : 
+      active ? (variant === 'amber' ? 'bg-amber-500' : 'bg-emerald-600') : 'bg-slate-200'
+    }`}></div>
     <p className={`text-[10px] font-black uppercase tracking-widest ${highlight ? 'text-emerald-600' : 'text-slate-400'}`}>{date}</p>
     <p className={`text-sm font-bold mt-1 ${highlight ? 'text-emerald-900 dark:text-emerald-400' : 'text-slate-700 dark:text-slate-200'}`}>{label}</p>
   </div>
